@@ -1,9 +1,30 @@
-# 灵月桌面 开发日志
+# LavaDesk 开发日志（原灵月桌面）
 
 > 近期事件，默认只读最近 3-5 条；当前能力看 [项目状态](project-status.md)，可复用结论看 [开发经验](dev-lessons.md)，资料取舍看 [知识索引](knowledge-index.md)。
 > 历史记录只证明当时的事件，不代表当前方案或新的操作授权；旧路径/旧结论保留以便追溯。
 
 历史归档：[2026-08](archive/dev-log-2026-08.md) · [2026-05](archive/dev-log-2026-05.md) · [2026-04](archive/dev-log-2026-04.md)。主页和归档不重复保存同一条事件。
+
+## [2026-10-07] 灵月桌面改名 LavaDesk、便签拆分为独立软件 LavaNotes
+
+**变更摘要**: 按用户要求统一 Lava 命名并把便签拆成独立开源软件：本仓库移除画布内置便利贴，改为检测/唤起 LavaNotes；应用标识、安装包、数据目录与更新源改为 LavaDesk，首次启动自动迁移灵月桌面的旧数据。LavaNotes 1.0.0（透明纸张窗口、钉在桌面、图片/表格、待办）已在本地仓库完成并提交，等待用户创建 `chengcczzjj/LavaNotes` 后推送。
+
+**涉及模块**:
+- 移除 `todo-board` 组件、任务便笺工作台、`manage_todo_tasks`、画布文字输入焦点与便利贴置顶 IPC；`widget-data.ts` 仍可读取退役类型，加载时备份到 `legacy-sticky-notes/` 再过滤。
+- 新增 `lavanotes-service.ts`、`LavaNotesPanel.tsx`、AI 工具 `open_lavanotes`（`lavanotes://new?text=` 等）。
+- `package.json`/`electron-builder.yml`/发布流程/核验脚本：`LavaDesk`、`com.lavadesk.app`、`LavaDesk-Setup-<版本>.exe`、更新源 `chengcczzjj/LavaDesk`；数据文件 `lavadesk-config.json`、`lavadesk-*.db`；版本 1.2.0。
+- `legacyUserDataCore.ts`/`legacyDataMigration.ts`：作为主进程第一个 import，关闭旧进程后复制 `%APPDATA%\lingyue-desk`、改名、改写 JSON 绝对路径并写迁移标记；就绪后取消旧开机启动、提示卸载旧版。
+
+**验证结果**:
+- `npm test`：typecheck、lint 通过；单元/契约 106 通过，1 项失败为基线已知、依赖 Windows 路径分隔符的桌面图标导入测试（改动前同样失败）。
+- `npm run build:check` 通过；三组 Electron 冒烟在容器内加 `--no-sandbox`（root 限制）后全部通过。
+- Linux 打包版对伪造旧目录实测迁移：标记 done、配置改名、快捷方式路径改写、缓存跳过。未在 Windows 实机验证关闭旧进程、开机启动清理、卸载提示与 `lavanotes://` 检测。
+- GitHub：创建仓库返回 403、无改名工具，FlowWallDesk → LavaDesk 改名与 LavaNotes 建库需用户操作；1.2.0 未发布。
+
+**经验关联**: L06（替代）、L15（新增）。
+**提交意图**: `feat(desktop): rename to LavaDesk, move sticky notes to LavaNotes and migrate LingyueDesk data`
+
+---
 
 ## [2026-09-26] 发布 1.1.13 并将开发收拢到 main
 
@@ -191,62 +212,5 @@
 - 当前开发机只有一台 `2560x1440` 显示器，不能把自动测试冒充公司混合 DPI 双屏验收；后续实机异常可直接依据 `display-diagnostics.jsonl` 中的 expected/actual 边界定位。
 
 **Git Commit**: 本次任务提交 — `fix(display): complete stable multi-monitor layout`
-
----
-
-## [2026-08-30 21:23] 发布 1.1.10 多显示器壁纸布局恢复版
-
-**变更摘要**: 将多显示器模式链路修复升版为 1.1.10，生成自动更新资产、完成本机覆盖安装并发布 GitHub Release。
-
-**涉及模块**:
-- `package.json` / `package-lock.json` / `tests/release-contracts.test.mjs`: 升级 1.1.10 版本元数据与发布契约。
-- `doc/发布说明/1.1.10.md` / `TempFile/文档资料/project-status.md`: 记录多显示器修复、验证结果、安装包校验和正式分发状态。
-- `dist/`: 生成 Windows x64 NSIS 安装包、blockmap 和 `latest.yml`；构建产物不进入 Git。
-
-**验证结果**:
-- `npm.cmd test` 通过全部 57 项测试；`npm.cmd run build:win` 成功。
-- 安装包 369,422,468 bytes，SHA-256 `2295587461FB99F36CD6E789ACE5A267EBC13B7591B393B9A5ED3BF059C60230`；blockmap 与 `latest.yml` 均完成哈希校验。
-- 本机 EXE、`app.asar` 和卸载注册表均更新为 1.1.10；当前壁纸、8 个桌面组件和 2 个全局图标组件完整保留，安装后进程正常运行。
-- GitHub Release：`https://github.com/chengcczzjj/FlowWallDesk/releases/tag/v1.1.10`（安装包、blockmap、`latest.yml` 已上传并校验远端大小与 SHA-256）。
-
-**Git Commit**: 已提交 — `chore(release): publish LingyueDesk 1.1.10`
-
----
-
-## [2026-08-30 20:57] 恢复多显示器壁纸布局并修复模式覆盖
-
-**变更摘要**: 恢复仅主屏、复制、按屏独立和跨屏延展四种真实运行模式，修复壁纸应用后布局被强制改回按屏模式的问题。
-
-**涉及模块**:
-- `src/main/windows/displayLayout.ts` / `src/main/ipc/wallpaperIpc.ts` / `src/shared/wallpaper-display-layout.ts`: 让持久化模式重新驱动原生窗口数量、renderer 布局与 IPC 返回值，并保证“应用到当前布局”不覆盖复制/延展模式。
-- `src/renderer/main-ui/App.tsx` / `src/renderer/main-ui/pages/LibraryPage.tsx` / `src/renderer/main-ui/pages/settings/DisplaySettingsPage.tsx`: 恢复显示器设置页，在壁纸库常驻展示布局选择；仅按屏模式向单台显示器应用壁纸。
-- `tests/wallpaper-display.test.mjs`: 覆盖模式持久化、单屏独立分配、跨屏窗口联合矩形、强制铺满和应用壁纸后保留布局。
-
-**遇到的问题**:
-- 1.1.6 为消除两个设置入口的冲突，把模式读取、模式写入和 renderer 布局全部硬编码成 `per-display`，同时库页面任何应用操作都使用显示器 id → 跨屏/复制配置必然失效，模式选择看似保存但窗口层从未采用；现统一为一个持久化模式状态，并按模式解析应用目标。
-
-**验证结果**:
-- `npm.cmd test` 通过全部 57 项测试；`npm.cmd run build:check` 成功。
-
-**Git Commit**: 已提交 — `fix(wallpaper): restore multi-monitor wallpaper modes`
-
----
-
-## [2026-08-30 20:15] 发布 1.1.9 便利贴即时置顶与画布性能优化版
-
-**变更摘要**: 将便利贴置顶触发提前到 `pointerdown` 捕获阶段，并以显式层级持久化和自适应原生命中轮询优化重叠交互与空闲性能。
-
-**涉及模块**:
-- `package.json` / `package-lock.json` / `doc/发布说明/1.1.9.md` / `tests/release-contracts.test.mjs`: 升级 1.1.9 版本元数据、发布说明和自动更新契约。
-- `src/renderer/canvas/Canvas.tsx`: 使用捕获阶段 + 同步提交确保按下即置顶。
-- `src/shared/widget-order.ts` / `src/shared/canvas-hit-test.ts` / `src/main/ipc/widgetIpc.ts` / `src/main/windows/canvasWindow.ts`: 显式层级、置顶 IPC、按视觉层级命中和自适应轮询。
-
-**验证结果**:
-- `npm.cmd test` 通过全部 54 项测试；`npm.cmd run build:win` 成功生成 Windows x64 NSIS 安装包、blockmap 和 `latest.yml`。
-- 安装包 `dist/lingyue-desk-1.1.9-setup.exe`：369,418,473 bytes，SHA-256 `E4F2D75682E3AE67935D0FAE5A91AC0AD78B0475D8961985E899D99C4110F92E`，electron-updater SHA-512 `QOh5kbqq5CNzz1E+a0ZiooG5Aat3NNGM1MVv2wjP8pNal3aY4MWYaK8mQRw7gQrZbkQc7TccTSaGgeZxpvkYFg==`。
-- 本机已停止旧进程并静默覆盖安装 1.1.9；EXE 版本、运行目录和卸载注册表入口更新，8 个组件、2 个全局图标组件、当前壁纸及组件层级数据保留，安装后进程正常运行。
-- GitHub Release：`https://github.com/chengcczzjj/FlowWallDesk/releases/tag/v1.1.9`（安装包、blockmap、`latest.yml` 已上传并校验远端大小与 SHA-256）。
-
-**Git Commit**: `99f6a1a chore(release): publish LingyueDesk 1.1.9`
 
 ---

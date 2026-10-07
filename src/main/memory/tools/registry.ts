@@ -22,11 +22,11 @@ import {
   arrangeWidgetTool,
   createGeneratedWidgetTool,
   listWidgetsTool,
-  manageTodoTasksTool,
   removeWidgetTool,
   updateGeneratedWidgetTool,
   updateWidgetConfigTool,
 } from './definitions/widgets'
+import { openLavaNotesTool } from './definitions/lavanotes'
 import {
   desktopSceneApplyTool,
   desktopSceneGetTool,
@@ -79,7 +79,7 @@ export function getToolSet(context: WorkspaceToolContext = {}, selectedToolNames
     update_generated_widget: updateGeneratedWidgetTool,
     remove_widget: removeWidgetTool,
     create_generated_widget: createGeneratedWidgetTool,
-    manage_todo_tasks: manageTodoTasksTool,
+    open_lavanotes: openLavaNotesTool,
     widget_capability_list: widgetCapabilityListTool,
     desktop_scene_get: desktopSceneGetTool,
     desktop_scene_preview: desktopScenePreviewTool,

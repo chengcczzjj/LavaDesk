@@ -44,7 +44,7 @@ function buildTrayMenu(): Menu {
 /** Show (or clear) an update action in the tray menu and tooltip. */
 export function setTrayUpdateEntry(entry: TrayUpdateEntry | null): void {
   updateEntry = entry
-  tray?.setToolTip(entry?.enabled ? `灵月 LingyueDesk · ${entry.label}` : '灵月 LingyueDesk')
+  tray?.setToolTip(entry?.enabled ? `LavaDesk · ${entry.label}` : 'LavaDesk')
 }
 
 export function createTray(): Tray {
@@ -55,7 +55,7 @@ export function createTray(): Tray {
 
   const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon)
-  tray.setToolTip('灵月 LingyueDesk')
+  tray.setToolTip('LavaDesk')
 
   // 不用 setContextMenu（Windows 上会吞掉首次左键点击），改用 right-click 弹出；
   // 每次弹出时重建，以便显示最新的更新状态。

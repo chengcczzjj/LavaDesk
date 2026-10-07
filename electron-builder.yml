@@ -1,5 +1,5 @@
-appId: com.lingyue.desk
-productName: LingyueDesk
+appId: com.lavadesk.app
+productName: LavaDesk
 asar: true
 directories:
   buildResources: resources/build
@@ -17,9 +17,9 @@ extraResources:
     filter: ['**/*']
 win:
   icon: resources/build/icon.ico
-  executableName: LingyueDesk
+  executableName: LavaDesk
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: LavaDesk-Setup-${version}.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
@@ -27,5 +27,5 @@ npmRebuild: false
 publish:
   - provider: github
     owner: chengcczzjj
-    repo: FlowWallDesk
+    repo: LavaDesk
     releaseType: release

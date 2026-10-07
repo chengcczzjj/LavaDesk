@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '@shared/ipc-channels'
-import type { WallpaperApplyTarget, WallpaperItem, WallpaperSettings, WallpaperResourceCatalog, WallpaperResourceProgress, WallpaperResourceActionResult, WallpaperOwnerStatus, WallpaperOwnerConfigInput, WallpaperPublishInput, WallpaperPublishProgress, WallpaperPublishResult, WallpaperDisplayMode, WallpaperDisplaySettings, WidgetInstance, NewsItem, StockItem, StockSymbol, WeatherSnapshot, ApiEndpointMeta, ChatConversation, ChatMessage, ChatMemory, ModelProfile, ConversationMode, ChatProject, AgentRun, AgentRunEvent, AgentApproval, AgentApprovalDecision, AgentArtifact, AgentFileChange, AgentFileChangeReviewState, AgentAutomation, AgentAutomationResult, AgentAutomationScheduleType, AgentAutomationStatus, WorkspacePermissionProfile, AppUpdateStatus, LaunchAtLoginStatus } from '@shared/types'
+import type { WallpaperApplyTarget, WallpaperItem, WallpaperSettings, WallpaperResourceCatalog, WallpaperResourceProgress, WallpaperResourceActionResult, WallpaperOwnerStatus, WallpaperOwnerConfigInput, WallpaperPublishInput, WallpaperPublishProgress, WallpaperPublishResult, WallpaperDisplayMode, WallpaperDisplaySettings, WidgetInstance, NewsItem, StockItem, StockSymbol, WeatherSnapshot, ApiEndpointMeta, ChatConversation, ChatMessage, ChatMemory, ModelProfile, ConversationMode, ChatProject, AgentRun, AgentRunEvent, AgentApproval, AgentApprovalDecision, AgentArtifact, AgentFileChange, AgentFileChangeReviewState, AgentAutomation, AgentAutomationResult, AgentAutomationScheduleType, AgentAutomationStatus, WorkspacePermissionProfile, AppUpdateStatus, LaunchAtLoginStatus, LavaNotesCommand, LavaNotesStatus } from '@shared/types'
 
 const api = {
   app: {
@@ -31,6 +31,13 @@ const api = {
       ipcRenderer.on(IPC.APP_NAVIGATE, handler)
       return () => ipcRenderer.off(IPC.APP_NAVIGATE, handler)
     },
+  },
+  /** Sticky notes live in the separate LavaNotes app. */
+  lavanotes: {
+    status: (): Promise<LavaNotesStatus> => ipcRenderer.invoke(IPC.LAVANOTES_STATUS),
+    open: (command: LavaNotesCommand): Promise<LavaNotesStatus & { opened: boolean }> =>
+      ipcRenderer.invoke(IPC.LAVANOTES_OPEN, command),
+    download: (): Promise<boolean> => ipcRenderer.invoke(IPC.LAVANOTES_DOWNLOAD),
   },
   utils: {
     getFilePath: (file: File): string | undefined => {

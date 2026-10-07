@@ -12,8 +12,8 @@ export interface CanvasHitCandidate {
 
 /**
  * A widget's rendered footprint in canvas client coordinates, measured from
- * the DOM. Persisted rects can differ from what is painted (rotated sticky
- * notes, fit-content clocks, animated Dock icons), and every disagreement
+ * the DOM. Persisted rects can differ from what is painted (fit-content
+ * clocks, animated Dock icons), and every disagreement
  * between the main-process poll and the renderer used to flip the transparent
  * canvas between capture and click-through.
  */

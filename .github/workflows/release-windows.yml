@@ -67,7 +67,7 @@ jobs:
             exit 1
           fi
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "INSTALLER=lingyue-desk-$VERSION-setup.exe" >> "$GITHUB_ENV"
+          echo "INSTALLER=LavaDesk-Setup-$VERSION.exe" >> "$GITHUB_ENV"
 
       - name: Refuse to overwrite a published release
         env:
@@ -106,7 +106,7 @@ jobs:
           gh release create "$RELEASE_TAG" \
             --draft \
             --target "$GITHUB_SHA" \
-            --title "LingyueDesk $APP_VERSION" \
+            --title "LavaDesk $APP_VERSION" \
             --notes-file release-notes.md \
             "dist/$INSTALLER" \
             "dist/$INSTALLER.blockmap" \

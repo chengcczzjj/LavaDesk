@@ -208,59 +208,14 @@ export interface WidgetInstance {
   displayKey?: string
 }
 
-export type TodoTaskCategory = 'work' | 'study' | 'life' | 'health' | 'other'
+/** lavanotes:// commands LavaDesk may send to the separate LavaNotes app. */
+export type LavaNotesCommand = 'new' | 'open' | 'manager'
 
-export type TodoTaskPriority = 'high' | 'normal' | 'low'
-
-export type TodoNoteColor = 'butter' | 'rose' | 'mint' | 'sky' | 'lilac'
-
-export type TodoNotePaperStyle = 'tape' | 'pin' | 'plain'
-
-export type TodoNoteFontFamily = 'system' | 'serif' | 'mono' | 'handwritten'
-
-/** 便利贴编辑器的直接文字样式；正文 HTML 另存于 TodoWidgetConfig.bodyHtml。 */
-export interface TodoTextStyle {
-  fontFamily: TodoNoteFontFamily
-  fontSize: number
-  bold: boolean
-  italic: boolean
-  underline: boolean
-  strike: boolean
-}
-
-/** 桌面任务便笺中的单项任务。时间戳使用本地设备的 Unix 毫秒值。 */
-export interface TodoTask {
-  id: string
-  title: string
-  done: boolean
-  createdAt: number
-  updatedAt: number
-  completedAt?: number
-  dueAt?: number
-  category: TodoTaskCategory
-  priority: TodoTaskPriority
-  remind: boolean
-}
-
-/** 旧版聚合任务板配置，仅用于无损迁移。 */
-export interface LegacyTodoWidgetConfig {
-  version: 1
-  title: string
-  tasks: TodoTask[]
-  view: 'plan' | 'week'
-  weekOffset: number
-}
-
-/** 一张桌面便利贴只承载一项任务；统计和周记由主应用跨实例聚合。 */
-export interface TodoWidgetConfig {
-  version: 2
-  task?: TodoTask
-  color: TodoNoteColor
-  paperStyle: TodoNotePaperStyle
-  rotation: number
-  textStyle: TodoTextStyle
-  bodyHtml?: string
-  tearRequestedAt?: number
+export interface LavaNotesStatus {
+  installed: boolean
+  /** Name Windows reports for the registered app. */
+  name?: string
+  downloadUrl: string
 }
 
 export interface CanvasOcclusionState {

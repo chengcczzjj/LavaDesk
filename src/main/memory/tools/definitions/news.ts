@@ -59,7 +59,7 @@ async function fetchCodelife(source: string, maxItems: number) {
   const apiSource = sourceMap[source] ?? 'toutiao'
   const res = await net.fetch(`https://api.codelife.cc/api/top/list?lang=cn&id=${apiSource}`, {
     method: 'GET',
-    headers: { 'User-Agent': 'LingyueDesk/1.0' },
+    headers: { 'User-Agent': 'LavaDesk/1.0' },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const json = (await res.json()) as { data?: { title: string; hot?: string; url?: string }[] }

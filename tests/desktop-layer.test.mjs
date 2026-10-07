@@ -11,7 +11,7 @@ import {
 } from '../src/shared/canvas-hit-test.ts'
 
 test('renderer hit regions are validated before they route native input', () => {
-  const region = { id: 'note-1', type: 'todo-board', x: 10, y: 20, width: 220, height: 190, stackOrder: 3 }
+  const region = { id: 'card-1', type: 'generated-widget', x: 10, y: 20, width: 220, height: 190, stackOrder: 3 }
   assert.deepEqual(sanitizeCanvasHitRegions([region]), [region])
   // Empty rectangles are skipped, malformed payloads are rejected as a whole.
   assert.deepEqual(sanitizeCanvasHitRegions([{ ...region, width: 0 }]), [])
@@ -20,12 +20,12 @@ test('renderer hit regions are validated before they route native input', () => 
   assert.equal(sanitizeCanvasHitRegions('nope'), null)
   assert.equal(sanitizeCanvasHitRegions(Array.from({ length: 201 }, () => region)), null)
 
-  // A rotated note's measured footprint extends past its persisted rect.
+  // A widget's measured footprint can extend past its persisted rect.
   const persisted = { ...region, x: 100, y: 100, enabled: true }
   const measured = { ...region, x: 96, y: 98, width: 228, height: 196 }
   const canvas = { x: 0, y: 0, width: 1920, height: 1080 }
   assert.equal(findInteractiveWidgetAtPoint({ x: 97, y: 150 }, canvas, [persisted]), undefined)
-  assert.equal(findInteractiveWidgetAtPoint({ x: 97, y: 150 }, canvas, [measured])?.id, 'note-1')
+  assert.equal(findInteractiveWidgetAtPoint({ x: 97, y: 150 }, canvas, [measured])?.id, 'card-1')
 })
 
 test('widgets covered by another window never make the canvas capture the mouse', () => {

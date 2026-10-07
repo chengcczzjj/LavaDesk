@@ -38,7 +38,7 @@ export function createMainWindow(target?: MainWindowNavTarget): BrowserWindow {
     backgroundColor: '#eef2f7',
     frame: false,
     titleBarStyle: 'hidden',
-    title: '灵月 LingyueDesk',
+    title: 'LavaDesk',
     icon: appIconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

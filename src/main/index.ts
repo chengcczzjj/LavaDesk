@@ -1,3 +1,6 @@
+// Must stay the first import: moves LingyueDesk's data into LavaDesk's folder
+// before electron-store, the memory database or Chromium open it.
+import { finishLegacyMigrationAfterReady } from './runtime/legacyDataMigration'
 import { app, BrowserWindow, session } from 'electron'
 import { mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
@@ -40,7 +43,7 @@ if (process.platform === 'win32') {
 
 // 开发模式下把 Chromium 会话缓存挪到临时目录，避免默认 profile 缓存权限冲突刷屏。
 if (is.dev) {
-  const sessionDataPath = join(app.getPath('temp'), 'LingyueDesk', `electron-session-${process.pid}`)
+  const sessionDataPath = join(app.getPath('temp'), 'LavaDesk', `electron-session-${process.pid}`)
   const diskCachePath = join(sessionDataPath, 'Cache')
   try {
     mkdirSync(diskCachePath, { recursive: true })
@@ -82,7 +85,7 @@ app.on('second-instance', (_event, argv) => {
 })
 
 app.whenReady().then(async () => {
-  electronApp.setAppUserModelId('com.lingyue.desk')
+  electronApp.setAppUserModelId('com.lavadesk.app')
   logDockDiagnostic('app.started', {
     version: app.getVersion(),
     packaged: app.isPackaged,
@@ -146,6 +149,7 @@ app.whenReady().then(async () => {
   // 恢复上次状态
   await restoreWallpaper()
   await restoreWidgets()
+  void finishLegacyMigrationAfterReady()
   if (is.dev && process.env.LINGYUE_DOCK_SELF_TEST) {
     const rounds = Math.max(1, Math.min(10, Number(process.env.LINGYUE_DOCK_SELF_TEST_ROUNDS) || 3))
     const initialDelayMs = Math.max(500, Math.min(60_000, Number(process.env.LINGYUE_DOCK_SELF_TEST_DELAY_MS) || 2_500))

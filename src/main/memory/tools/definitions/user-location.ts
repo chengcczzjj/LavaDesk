@@ -114,7 +114,7 @@ async function fetchJson(url: string): Promise<unknown> {
       headers: {
         Accept: 'application/json',
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.6',
-        'User-Agent': 'LingyueDesk/1.0',
+        'User-Agent': 'LavaDesk/1.0',
       },
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)

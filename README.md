@@ -1,6 +1,20 @@
-# 灵月 LingyueDesk
+# LavaDesk
 
-Windows 桌面 AI 伴侣应用：动态壁纸、桌面组件、AI 对话与像素桌宠。
+Windows 桌面 AI 伴侣应用：动态壁纸、桌面组件、AI 对话与像素桌宠。原名灵月桌面（LingyueDesk），1.2.0 起改名 LavaDesk，与 [LavaTranslate](https://github.com/chengcczzjj/LavaTranslate)、[LavaNotes](https://github.com/chengcczzjj/LavaNotes) 同属 Lava 系列；AI 伴侣的名字仍是“灵月”。
+
+## 便签：LavaNotes
+
+桌面便签已拆分为独立开源软件 [LavaNotes](https://github.com/chengcczzjj/LavaNotes)：每张便签是一个透明纸张窗口，可插入图片和表格、右下角缩放，还能钉在桌面上（显示桌面、最小化全部窗口都不会收起）。LavaDesk 的“小组件 > 便签”页面会检测 LavaNotes：已安装就直接新建/打开，未安装则提示下载。AI 伴侣通过 `lavanotes://` 协议唤起它。旧版内置便利贴不再显示，升级时其数据会在本机备份到数据目录的 `legacy-sticky-notes/`。
+
+## 从灵月桌面升级
+
+LavaDesk 的安装标识、可执行文件和数据目录都已改名（`com.lavadesk.app`、`LavaDesk.exe`、`%APPDATA%\LavaDesk`），因此是一个新安装的应用，不会覆盖旧版。安装后首次启动时：
+
+1. 如果旧版 `LingyueDesk.exe` 正在运行，LavaDesk 会先关闭它（数据库文件需要释放）。
+2. 把 `%APPDATA%\lingyue-desk` 复制到 `%APPDATA%\LavaDesk`（跳过 Chromium 缓存），`lingyue-config.json`、`lingyue-memory.db` 等改为 `lavadesk-*` 文件名，并改写 JSON 里指向旧目录的绝对路径（例如图标收纳中的桌面快捷方式）。
+3. 取消旧版的开机启动，并询问是否卸载旧版。旧数据目录保持原样作为备份，确认无误后可手动删除。
+
+迁移结果记录在 `%APPDATA%\LavaDesk\.lavadesk-migration.json`；迁移逻辑见 [legacyUserDataCore.ts](src/main/runtime/legacyUserDataCore.ts)。
 
 ## 技术栈
 
@@ -57,12 +71,12 @@ npm run build:dir        # 仅生成未打包目录，便于本地调试
 
 ## 在线壁纸资源
 
-“壁纸资源 > 壁纸库”通过独立的 `chengcczzjj/LingyueDesk-Wallpapers` 公开仓库读取资源清单，支持按壁纸下载、SHA-256 校验、版本更新、应用和删除，不需要为新增壁纸发布整个应用版本。
+“壁纸资源 > 壁纸库”通过独立的 `chengcczzjj/LavaDesk-Wallpapers` 公开仓库读取资源清单，支持按壁纸下载、SHA-256 校验、版本更新、应用和删除，不需要为新增壁纸发布整个应用版本。
 
 正式安装版默认隐藏发布入口。仓库所有者可完全退出应用后，以所有者模式启动：
 
 ```powershell
-& "$env:LOCALAPPDATA\Programs\LingyueDesk\LingyueDesk.exe" --lingyue-wallpaper-owner
+& "$env:LOCALAPPDATA\Programs\LavaDesk\LavaDesk.exe" --lingyue-wallpaper-owner
 ```
 
 进入“壁纸资源 > 壁纸库 > 资源发布管理”，配置属于官方仓库所有者的 GitHub Token 后，即可在 UI 中选择本地壁纸、打包独立 ZIP、上传 GitHub Release 并更新 `manifest.json`。Token 使用 Windows DPAPI 加密且不会暴露给渲染层。详细格式和发布规则见 [壁纸资源托管与下载方案](doc/壁纸资源托管与下载方案.md)。

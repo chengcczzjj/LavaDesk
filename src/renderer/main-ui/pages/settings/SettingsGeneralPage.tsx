@@ -403,7 +403,7 @@ export function SettingsGeneralPage() {
           <div className="settings-card__icon"><RefreshCw size={18} /></div>
           <div className="settings-card__body" aria-live="polite">
             <div className="settings-card__title">
-              灵月桌面 v{updateStatus?.currentVersion || '—'}
+              LavaDesk v{updateStatus?.currentVersion || '—'}
             </div>
             <div className="settings-card__desc settings-update-card__message">
               {updateActionError || updateStatus?.message || '正在读取更新状态…'}
@@ -440,7 +440,7 @@ export function SettingsGeneralPage() {
           <div className="settings-card__icon"><Power size={18} /></div>
           <div className="settings-card__body">
             <div className="settings-card__title">开机自启动</div>
-            <div className="settings-card__desc">系统启动时自动运行灵月桌面</div>
+            <div className="settings-card__desc">系统启动时自动运行 LavaDesk</div>
             {autoStartMessage && <div className="settings-card__desc settings-card__desc--status">{autoStartMessage}</div>}
           </div>
           <div className="settings-card__action">
@@ -464,7 +464,7 @@ export function SettingsGeneralPage() {
           <div className="settings-card__icon"><Monitor size={18} /></div>
           <div className="settings-card__body">
             <div className="settings-card__title">系统托盘图标</div>
-            <div className="settings-card__desc">灵月常驻系统托盘，用于打开主界面和退出应用，不能关闭</div>
+            <div className="settings-card__desc">LavaDesk 常驻系统托盘，用于打开主界面和退出应用，不能关闭</div>
           </div>
           <div className="settings-card__action">
             <label className="toggle-switch toggle-switch--disabled" title="托盘是关闭主界面后唯一的入口">

@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { tool } from 'ai'
 import { z } from 'zod'
-import type { TodoTask, TodoTaskCategory, TodoTaskPriority, WidgetInstance } from '@shared/types'
+import type { WidgetInstance } from '@shared/types'
 import { DEFAULT_WIDGET_SIZE_BY_TYPE, WIDGET_TYPES, getWidgetCapability, type WidgetTypeId } from '@shared/desktop-scene'
 import {
   GENERATED_WIDGET_MAX_SIZE,
@@ -22,25 +22,11 @@ import {
 import { normalizeStockSymbols } from '@shared/stock-symbols'
 import { WIDGET_ANCHORS } from '@shared/widget-anchor'
 import {
-  TODO_NOTE_COLORS,
-  TODO_NOTE_PAPER_STYLES,
-  TODO_TASK_LIMIT,
-  collectTodoTasks,
-  createTodoTask,
-  createTodoWidgetConfig,
-  inferTodoCategory,
-  normalizeTodoWidgetConfig,
-  sanitizeTodoTitle,
-  setTodoTaskDone,
-  summarizeTodoWeek,
-} from '@shared/todo'
-import {
   addWidgetForTool,
   arrangeWidgetForTool,
   listWidgetsForTool,
   removeWidgetForTool,
   updateWidgetConfigForTool,
-  updateWidgetForTool,
 } from '../../../ipc/widgetIpc'
 
 const PERSISTENT_WIDGET_TYPES = new Set(['desktop-icons-box', 'desktop-icons-horizontal', 'desktop-icons-adaptive', 'desktop-icons-dock'])
@@ -54,10 +40,7 @@ const PERSISTENT_WIDGET_TYPES = new Set(['desktop-icons-box', 'desktop-icons-hor
 export function summarizeWidget(widget: WidgetInstance) {
   const config = widget.config ?? {}
   const content: Record<string, unknown> = {}
-  if (widget.type === 'todo-board') {
-    const note = normalizeTodoWidgetConfig(config)
-    content.task = note.task ? { id: note.task.id, title: note.task.title, done: note.task.done } : null
-  } else if (widget.type === 'generated-widget' && isGeneratedWidgetDefinition(config.definition)) {
+  if (widget.type === 'generated-widget' && isGeneratedWidgetDefinition(config.definition)) {
     content.title = config.definition.title
     content.theme = config.definition.theme
     content.blocks = config.definition.blocks.map((block) => block.type)
@@ -137,9 +120,9 @@ export const listWidgetsTool = tool({
 })
 
 export const addWidgetTool = tool({
-  description: '把一个内置桌面组件添加到桌面，会自动避开已有组件并对齐网格。优先用 preset 选择设计好的样式、用 anchor 指定位置；config 只能使用 widget_capability_list / list_widgets(includeOptions) 给出的设置项。实时股票必须使用 type=stocks 并在 stockSymbols 中传入 A 股代码；待办任务用 manage_todo_tasks；不要用 generated-widget 伪造静态行情。',
+  description: '把一个内置桌面组件添加到桌面，会自动避开已有组件并对齐网格。优先用 preset 选择设计好的样式、用 anchor 指定位置；config 只能使用 widget_capability_list / list_widgets(includeOptions) 给出的设置项。实时股票必须使用 type=stocks 并在 stockSymbols 中传入 A 股代码；便签和待办用 open_lavanotes 交给 LavaNotes；不要用 generated-widget 伪造静态行情。',
   inputSchema: z.object({
-    type: z.enum(WIDGET_TYPES).describe('组件类型。待办清单/任务便笺用 todo-board；纯文本便签用 text；股票用 stocks；天气用 weather；日历用 calendar。'),
+    type: z.enum(WIDGET_TYPES).describe('组件类型。桌面短句用 text；股票用 stocks；天气用 weather；日历用 calendar。'),
     preset: z.string().max(60).optional().describe('组件能力列表中的预设 id，例如 clock 的 minimal-light。'),
     anchor: z.enum(WIDGET_ANCHORS).optional().describe('放在主显示器的哪个位置；省略时自动寻找整齐的空位。'),
     config: z.record(z.string(), z.unknown()).optional().describe('额外设置，会覆盖预设。例如 text: { text, author }；weather: { style: "glass" }；news: { source, maxItems }。'),
@@ -170,8 +153,6 @@ export const addWidgetTool = tool({
       }
       const refreshInterval = typeof normalizedConfig.refreshInterval === 'number' ? normalizedConfig.refreshInterval : 30
       normalizedConfig = { ...normalizedConfig, symbols, refreshInterval }
-    } else if (type === 'todo-board') {
-      normalizedConfig = { ...normalizeTodoWidgetConfig(normalizedConfig) }
     } else if (type === 'generated-widget') {
       return { ok: false, added: false, reason: 'use-create-generated-widget', message: '生成式组件请使用 create_generated_widget。' }
     }
@@ -185,174 +166,6 @@ export const addWidgetTool = tool({
       widget: summarizeWidget(result.widget),
       config: reportConfigPatch(type, patch),
       count: result.list.length,
-    }
-  },
-})
-
-function summarizeTodoTask(task: TodoTask, widget?: WidgetInstance) {
-  return {
-    id: task.id,
-    title: task.title,
-    done: task.done,
-    category: task.category,
-    priority: task.priority,
-    remind: task.remind,
-    dueAt: task.dueAt ? new Date(task.dueAt).toISOString() : undefined,
-    createdAt: new Date(task.createdAt).toISOString(),
-    completedAt: task.completedAt ? new Date(task.completedAt).toISOString() : undefined,
-    widgetId: widget?.id,
-    desktopVisible: widget?.enabled,
-  }
-}
-
-function parseTodoDueAt(value: string | undefined): number | undefined | null {
-  if (!value) return undefined
-  const localDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
-  if (localDate) {
-    const [, year, month, day] = localDate
-    const parsedDate = new Date(Number(year), Number(month) - 1, Number(day), 21, 0, 0, 0)
-    const valid = parsedDate.getFullYear() === Number(year)
-      && parsedDate.getMonth() === Number(month) - 1
-      && parsedDate.getDate() === Number(day)
-    return valid ? parsedDate.getTime() : null
-  }
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-const todoTaskActionSchema = z.object({
-  action: z.enum(['list', 'add', 'update', 'complete', 'reopen', 'delete', 'clear-completed', 'weekly-summary']),
-  taskId: z.string().min(1).max(120).optional().describe('修改、完成、恢复或删除时使用；先 list 获取准确 id。'),
-  title: z.string().min(1).max(160).optional().describe('新增或重命名后的任务标题。'),
-  dueAt: z.string().max(80).optional().describe('截止时间，优先使用带时区的 ISO 8601；仅日期 YYYY-MM-DD 时默认当天 21:00。'),
-  clearDueAt: z.boolean().optional().describe('更新任务时移除截止时间。'),
-  category: z.enum(['work', 'study', 'life', 'health', 'other']).optional().describe('可省略，系统会按标题自动分类。'),
-  priority: z.enum(['high', 'normal', 'low']).optional(),
-  remind: z.boolean().optional(),
-  weekOffset: z.number().int().min(-52).max(0).optional().describe('周总结偏移；0=本周，-1=上周。'),
-}).superRefine((value, context) => {
-  if (value.action === 'add' && !value.title) {
-    context.addIssue({ code: 'custom', path: ['title'], message: 'add action requires title' })
-  }
-  if (['update', 'complete', 'reopen', 'delete'].includes(value.action) && !value.taskId) {
-    context.addIssue({ code: 'custom', path: ['taskId'], message: `${value.action} action requires taskId` })
-  }
-})
-
-export const manageTodoTasksTool = tool({
-  description: '管理真实的桌面便利贴任务：每项任务是一张可独立拖动、缩放和叠放的便利贴。支持查看、新增、修改、完成撕下、恢复贴回、删除、清理完成记录或生成周总结。修改/删除前先 list 获取 taskId，不要猜 id。',
-  inputSchema: todoTaskActionSchema,
-  execute: async ({ action, taskId, title, dueAt, clearDueAt, category, priority, remind, weekOffset }) => {
-    const widgets = listWidgetsForTool().filter((item) => item.type === 'todo-board')
-    const records = widgets.flatMap((widget) => {
-      const config = normalizeTodoWidgetConfig(widget.config)
-      return config.task ? [{ widget, config, task: config.task }] : []
-    })
-    const tasks = records.map((record) => record.task)
-    if (action === 'list') {
-      return { ok: true, action, count: tasks.length, tasks: records.map((record) => summarizeTodoTask(record.task, record.widget)) }
-    }
-    if (action === 'weekly-summary') {
-      const summary = summarizeTodoWeek(tasks, Date.now(), weekOffset ?? 0)
-      return {
-        ok: true,
-        action,
-        headline: summary.headline,
-        completedCount: summary.completed.length,
-        unfinishedCount: summary.unfinished.length,
-        completionRate: summary.completionRate,
-        activeDays: summary.activeDays,
-        completed: summary.completed.map((task) => summarizeTodoTask(task, records.find((record) => record.task.id === task.id)?.widget)),
-        unfinished: summary.unfinished.map((task) => summarizeTodoTask(task, records.find((record) => record.task.id === task.id)?.widget)),
-      }
-    }
-    if (action === 'add') {
-      if (widgets.length >= TODO_TASK_LIMIT) return { ok: false, action, error: 'task-limit-reached', message: `最多保存 ${TODO_TASK_LIMIT} 张任务便利贴。` }
-      const parsedDueAt = parseTodoDueAt(dueAt)
-      if (parsedDueAt === null) return { ok: false, action, error: 'invalid-due-at', message: '截止时间格式无效。' }
-      const safeTitle = sanitizeTodoTitle(title)
-      if (!safeTitle) return { ok: false, action, error: 'title-required', message: '任务标题不能为空。' }
-      const changedTask = createTodoTask({
-        id: `task-${Date.now()}-${randomUUID().slice(0, 8)}`,
-        title: safeTitle,
-        dueAt: parsedDueAt,
-        category: category as TodoTaskCategory | undefined,
-        priority: priority as TodoTaskPriority | undefined,
-        remind,
-      })
-      const index = widgets.length
-      const config = createTodoWidgetConfig({
-        task: changedTask,
-        color: TODO_NOTE_COLORS[index % TODO_NOTE_COLORS.length],
-        paperStyle: TODO_NOTE_PAPER_STYLES[index % TODO_NOTE_PAPER_STYLES.length],
-        rotation: [-1.8, 1.3, -0.8, 2.1, -1.2][index % 5],
-      })
-      const result = addWidgetForTool(createWidget('todo-board', { ...config }))
-      return {
-        ok: result.ok,
-        action,
-        widgetId: result.widget.id,
-        count: collectTodoTasks(result.list).length,
-        changedTask: summarizeTodoTask(changedTask, result.widget),
-      }
-    }
-
-    if (action === 'clear-completed') {
-      const completed = records.filter((record) => record.task.done)
-      for (const record of completed) await removeWidgetForTool({ id: record.widget.id })
-      return { ok: true, action, deletedCount: completed.length, count: tasks.length - completed.length }
-    }
-
-    const record = records.find((item) => item.task.id === taskId)
-    if (!record) return { ok: false, action, error: 'task-not-found', message: '没有找到这条任务，请先重新查看任务列表。' }
-    if (action === 'delete') {
-      const result = await removeWidgetForTool({ id: record.widget.id })
-      return { ok: result.ok, action, deleted: result.deleted, widgetId: record.widget.id, count: collectTodoTasks(result.list).length }
-    }
-
-    let changedTask: TodoTask
-    let nextConfig: ReturnType<typeof normalizeTodoWidgetConfig>
-    if (action === 'complete') {
-      const requestedAt = Date.now()
-      changedTask = record.task.done ? record.task : setTodoTaskDone(record.task, true, requestedAt)
-      nextConfig = { ...record.config, task: changedTask, tearRequestedAt: requestedAt }
-    } else if (action === 'reopen') {
-      changedTask = record.task.done ? setTodoTaskDone(record.task, false) : record.task
-      nextConfig = { ...record.config, task: changedTask, tearRequestedAt: undefined }
-      const result = updateWidgetForTool({ id: record.widget.id, config: { ...nextConfig }, enabled: true })
-      return {
-        ok: result.ok,
-        action,
-        error: result.error,
-        widgetId: record.widget.id,
-        count: collectTodoTasks(result.list).length,
-        changedTask: summarizeTodoTask(changedTask, result.widget),
-      }
-    } else {
-      const parsedDueAt = parseTodoDueAt(dueAt)
-      if (parsedDueAt === null) return { ok: false, action, error: 'invalid-due-at', message: '截止时间格式无效。' }
-      const safeTitle = title === undefined ? record.task.title : sanitizeTodoTitle(title)
-      if (!safeTitle) return { ok: false, action, error: 'title-required', message: '任务标题不能为空。' }
-      changedTask = {
-        ...record.task,
-        title: safeTitle,
-        dueAt: clearDueAt ? undefined : parsedDueAt ?? record.task.dueAt,
-        category: category ?? (title === undefined ? record.task.category : inferTodoCategory(safeTitle)),
-        priority: priority ?? record.task.priority,
-        remind: remind ?? record.task.remind,
-        updatedAt: Date.now(),
-      }
-      nextConfig = { ...record.config, task: changedTask }
-    }
-
-    const result = updateWidgetConfigForTool({ id: record.widget.id, config: { ...nextConfig } })
-    return {
-      ok: result.ok,
-      action,
-      error: result.error,
-      widgetId: record.widget.id,
-      count: collectTodoTasks(result.list).length,
-      changedTask: summarizeTodoTask(changedTask, result.widget),
     }
   },
 })
@@ -464,7 +277,7 @@ export const arrangeWidgetTool = tool({
     x: z.number().min(-32_768).max(32_768).optional().describe('以组件所在显示器左上角为原点的 x（像素）；一般用 anchor 代替。'),
     y: z.number().min(-32_768).max(32_768).optional().describe('以组件所在显示器左上角为原点的 y（像素）；一般用 anchor 代替。'),
     scale: z.number().min(0.5).max(3).optional().describe('相对当前大小的缩放倍数，例如 1.2 放大 20%。'),
-    width: z.number().min(40).max(1400).optional().describe('目标宽度（仅便利贴、音频可视化、生成式组件等可自由缩放的组件）。'),
+    width: z.number().min(40).max(1400).optional().describe('目标宽度（仅音频可视化、生成式组件等可自由缩放的组件）。'),
     height: z.number().min(40).max(1000).optional().describe('目标高度。'),
     visible: z.boolean().optional().describe('false 隐藏，true 恢复显示。Dock 和图标收纳不能隐藏。'),
     bringToFront: z.boolean().optional().describe('把组件叠放到最上层。'),

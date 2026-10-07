@@ -55,7 +55,7 @@ const NAV_TABS: Record<ActivityKey, { label: string; pages?: { id: string; label
   widgets: {
     label: '小组件',
     pages: [
-      { id: 'widgets-tasks', label: '任务便笺' },
+      { id: 'widgets-tasks', label: '便签' },
       { id: 'widgets-floating', label: '悬浮挂件' },
       { id: 'widgets-card', label: '卡片组件' },
       { id: 'widgets-icons', label: '图标收纳' },
@@ -235,7 +235,7 @@ export function App() {
     >
       <header className="title-bar">
         <img className="title-bar__icon" src={appIcon} alt="" />
-        <span className="title-bar__text">灵月 · LingyueDesk</span>
+        <span className="title-bar__text">LavaDesk</span>
         <div className="title-bar__spacer" />
         {activity === 'library' && (
           <div style={{ position: 'relative', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>

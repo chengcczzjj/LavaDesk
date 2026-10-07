@@ -76,6 +76,6 @@ const defaults: Schema = {
 }
 
 export const store = new Store<Schema>({
-  name: 'lingyue-config',
+  name: 'lavadesk-config',
   defaults,
 })

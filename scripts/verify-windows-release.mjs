@@ -35,8 +35,9 @@ function readManifest(raw) {
   return { version: scalar('version'), path: scalar('path'), sha512: scalar('sha512'), files }
 }
 
-const { version, name } = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
-const installerName = `${name}-${version}-setup.exe`
+const { version, productName } = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+// electron-builder.yml → nsis.artifactName: ${productName}-Setup-${version}.${ext}
+const installerName = `${productName}-Setup-${version}.exe`
 const installer = join(dist, installerName)
 const blockmap = `${installer}.blockmap`
 const manifest = readManifest(await readFile(join(dist, 'latest.yml'), 'utf8'))
@@ -59,6 +60,8 @@ const appAsar = join(dist, 'win-unpacked', 'resources', 'app.asar')
 const packaged = new Set(asar.listPackage(appAsar).map((entryPath) => entryPath.replace(/\\/g, '/')))
 const packagedJson = JSON.parse(asar.extractFile(appAsar, 'package.json').toString('utf8'))
 check(packagedJson.version === version, `app.asar package.json version ${packagedJson.version} != ${version}`)
+// productName decides the userData folder that the LingyueDesk data migration copies into.
+check(packagedJson.productName === productName, `app.asar package.json productName ${packagedJson.productName} != ${productName}`)
 for (const required of [
   '/out/main/index.js',
   '/out/preload/index.js',

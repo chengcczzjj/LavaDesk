@@ -1,6 +1,6 @@
 # 工程知识索引
 
-> 维护日期：2026-09-05。这里管理开发智能体的工程记忆，不保存应用内用户记忆；不在本页另设开发或授权规则。
+> 维护日期：2026-10-07。这里管理开发智能体的工程记忆，不保存应用内用户记忆；不在本页另设开发或授权规则。
 
 ## 各类信息只维护一个主入口
 
@@ -23,7 +23,9 @@
 | 任务 | 下一步最小阅读集合 |
 | --- | --- |
 | 双屏、壁纸错位、DPI、热插拔 | [多显示器方案](../../doc/双显示器支持方案.md) + 经验 L03 + display-layout 相关源码/测试 |
-| Dock、便笺、鼠标穿透、锁屏/全屏恢复 | 经验 L04-L06、L08 + canvas / widget 相关源码/测试 |
+| Dock、鼠标穿透、锁屏/全屏恢复 | 经验 L04-L06、L08 + canvas / widget 相关源码/测试 |
+| 便签（LavaNotes 检测与唤起） | 经验 L06、L15 + lavanotes-service / LavaNotesPanel；便签本身在 [LavaNotes 仓库](https://github.com/chengcczzjj/LavaNotes) |
+| 改名、数据目录、旧数据迁移 | 经验 L15 + legacyUserDataCore / legacy-migration 测试 |
 | 毛玻璃或常驻性能 | 经验 L07 + wallpaperFrameStore / FrostedGlassBackground |
 | 应用 AI 对话、人设、长期记忆 | 本页“产品设计资料” + 经验 L09；不要读取开发者全量日志给应用模型 |
 | 下载、更新、资源发布 | 经验 L10-L11 + [资源方案](../../doc/壁纸资源托管与下载方案.md) + release/resource 测试 |
@@ -51,6 +53,8 @@
 - `doc/project-status.md` 的历史引用现对应 [项目状态](project-status.md)；不在旧日志逐条改路径。
 - `doc/图标收纳组件方案.md` 的历史资料现位于 [早期方案](other/图标收纳组件方案.md)；当前模块设计见 [图标收纳设计](../../doc/小组件/图标收纳组件设计.md)。
 - `AI对话与智能体设计说明.md`、音频/天气等若干组件专用设计文档当前并不存在。使用本页现有资料与组件源码；不要把计划文件名当成可读取文件或补造历史内容。
+- 便利贴：2026-08-16 起的画布内“自由便利贴”（`todo-board`、任务工作台、`manage_todo_tasks`）已于 2026-10-07 移除，改为独立软件 LavaNotes。[桌面任务便笺设计](../../doc/小组件/桌面任务便笺组件设计.md) 只作历史参考，见 L06、L15。
+- 产品名：2026-10-07 起灵月桌面 / LingyueDesk 改名 LavaDesk（仓库 FlowWallDesk → LavaDesk、在线壁纸库 LingyueDesk-Wallpapers → LavaDesk-Wallpapers）。历史日志中的旧名、旧路径（`%APPDATA%\lingyue-desk`、`lingyue-config.json`）保持原样。
 - `other/灵月项目开发指南 .md` 文件名带空格；保留原路径兼容已有引用，Markdown 链接用 `%20` 表示空格。
 
 ## 更新方式

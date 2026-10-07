@@ -51,14 +51,14 @@
 - 验证：对照原生按键、renderer pointerdown/up、焦点与恢复事件；开发进程和安装进程的日志不可混用。
 - 来源：2026-08-01/03 手势与恢复修复、08-29 锁屏重建、08-30 ToDesk 门禁；后两者收紧早期无条件置顶经验。
 
-## L06 组件不是同一种布局：便利贴自由布局与显式层级
+## L06 组件层级显式持久化；便利贴已移出画布
 
-- 适用：拖动、碰撞、缩放、置顶、任务完成/恢复。
-- 根因：普通组件的网格/单实例规则不适合“一张任务一张纸”；完成即删除丢失统计和恢复依据。仅用数组顺序表示层级会在异步保存中覆盖新操作。
-- 当前约束：便利贴允许重叠、多实例、直接拖动；显式拖动把手优先于通用按钮门禁。完成动画后保留隐藏实例作为历史；采用持久化 `stackOrder`，位置/配置写入不能覆盖更晚的置顶操作。
-- 代码：[widget-order.ts](../../src/shared/widget-order.ts)、[TodoBoard.tsx](../../src/renderer/widgets/TodoBoard/TodoBoard.tsx)、[widgetIpc.ts](../../src/main/ipc/widgetIpc.ts)。测试：[todo-widget.test.mjs](../../tests/todo-widget.test.mjs)、[shared-contracts.test.mjs](../../tests/shared-contracts.test.mjs)。
-- 验证：窄/矮便笺、文字输入临时焦点、折角缩放、重叠命中、完成历史与恢复。浮动组件尺寸在字体就绪后实测，不只按缩放系数推算。
-- 来源：2026-04-26 视觉尺寸、08-16 便利贴重做、08-30 显式层级。
+- 适用：组件拖动、碰撞、缩放、置顶。
+- 根因：仅用数组顺序表示层级会在异步保存中覆盖新操作。
+- 当前约束：组件采用持久化 `stackOrder`，位置/配置写入不能覆盖更晚的置顶操作；浮动组件尺寸在字体就绪后实测，不只按缩放系数推算。
+- 替代关系：2026-10-07 起内置便利贴（`todo-board`）整体移除，改由独立软件 [LavaNotes](https://github.com/chengcczzjj/LavaNotes) 以“每张便签一个透明窗口”实现。全屏透明 Canvas 为便利贴做的自由拖动、临时键盘焦点（`setCanvasTextInputActive`）和点击置顶 IPC 一并删除；旧数据处理见 L15。
+- 代码：[widget-order.ts](../../src/shared/widget-order.ts)、[widgetIpc.ts](../../src/main/ipc/widgetIpc.ts)。测试：[shared-contracts.test.mjs](../../tests/shared-contracts.test.mjs)。
+- 来源：2026-04-26 视觉尺寸、08-16 便利贴重做、08-30 显式层级、10-07 便签拆分。
 
 ## L07 毛玻璃优化：不以降画质掩盖管线开销
 
@@ -134,3 +134,12 @@
 - CSP 与 iframe 沙箱保留包内脚本/样式/fetch，隔离父页面和 bridge，禁止子框架/对象/表单及顶层逃逸；网络 HTTPS 能力仍允许，不应把网页内容当可信应用代码。
 - 代码：[protocols.ts](../../src/main/protocols.ts)。测试：[wallpaper-security.test.mjs](../../tests/wallpaper-security.test.mjs)、[wallpaper-sandbox.cjs](../../tests/electron/wallpaper-sandbox.cjs)；后者在实际 Electron/Chromium 中验证隔离，不仅匹配 CSP 字符串。
 - 来源：2026-09-05 网页壁纸安全修复；第三方壁纸若依赖被禁能力应报告兼容性问题，不回退整目录授权或关闭沙箱。
+
+## L15 改名与退役：先保证旧数据能读，再迁移
+
+- 适用：改产品名/appId/数据目录、删除组件类型、更换数据文件名。
+- 根因：Electron 的 userData 目录取自 `productName`（无则 `name`），改名即换目录；`storedWidgetSchema` 用组件类型枚举校验，直接从枚举删掉 `todo-board` 会让所有含旧便利贴的配置被判为“格式异常”而拒绝加载。electron-store、记忆库和 Chromium 一旦打开新目录就会写入默认文件，迁移必须在它们之前完成。
+- 当前做法：退役类型列在 `RETIRED_WIDGET_TYPES`，读取仍接受，加载时先按命名空间备份到 `legacy-sticky-notes/` 再过滤，新增时拒绝。迁移模块是主进程第一个 import：仅安装版运行，先关闭旧进程，再整目录复制到暂存目录（跳过 Chromium 缓存与锁文件）、按映射改文件名、改写 JSON 中指向旧目录的绝对路径，最后逐项移入新目录并写 `.lavadesk-migration.json`。新目录已有 LavaDesk 自己的数据时不覆盖；旧目录原样保留。
+- 代码：[widget-data.ts](../../src/shared/widget-data.ts)、[legacyUserDataCore.ts](../../src/main/runtime/legacyUserDataCore.ts)、[legacyDataMigration.ts](../../src/main/runtime/legacyDataMigration.ts)。测试：[legacy-migration.test.mjs](../../tests/legacy-migration.test.mjs)、[desktop-ipc-regressions.test.mjs](../../tests/desktop-ipc-regressions.test.mjs)。
+- 验证：2026-10-07 容器内用 Linux 打包版对伪造旧目录实测复制、改名、路径改写和标记；Windows 下关闭旧进程、取消旧开机启动、卸载旧版需实机验收。SQLite 内若存有旧目录绝对路径不会被改写，旧目录保留期间仍可访问。
+- 来源：2026-10-07 LingyueDesk → LavaDesk 改名与便签拆分。

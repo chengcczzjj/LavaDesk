@@ -3,6 +3,17 @@ import { WIDGET_TYPES } from './desktop-scene'
 import type { WidgetInstance } from './types'
 
 export const MAX_WIDGETS = 200
+/**
+ * Types older releases stored but this release no longer renders. Stored lists
+ * that contain them must still parse; otherwise an upgrade would report every
+ * desktop as corrupt. They are filtered out (and backed up) when loaded.
+ * todo-board: the built-in sticky note, replaced by the separate LavaNotes app.
+ */
+export const RETIRED_WIDGET_TYPES = ['todo-board'] as const
+
+export function isRetiredWidgetType(type: string): boolean {
+  return (RETIRED_WIDGET_TYPES as readonly string[]).includes(type)
+}
 export const MAX_WIDGET_CONFIG_BYTES = 512 * 1024
 const configBytes = (config: unknown): number => new TextEncoder().encode(JSON.stringify(config ?? {})).length
 
@@ -16,7 +27,7 @@ export const widgetConfigSchema = z.record(z.string().max(120), z.unknown()).sup
 
 export const storedWidgetSchema = z.object({
   id: z.string().min(1).max(160).regex(/^[\w.-]+$/),
-  type: z.enum(WIDGET_TYPES),
+  type: z.enum([...WIDGET_TYPES, ...RETIRED_WIDGET_TYPES]),
   x: z.number().finite().min(-32_768).max(32_768),
   y: z.number().finite().min(-32_768).max(32_768),
   width: z.number().finite().min(0).max(4096),

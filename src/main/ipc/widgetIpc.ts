@@ -4,7 +4,7 @@ import { promises as fs } from 'fs'
 import { join } from 'path'
 import { IPC } from '@shared/ipc-channels'
 import { z } from 'zod'
-import { parseStoredWidgets, storedWidgetSchema, widgetConfigSchema, widgetInstanceSchema } from '@shared/widget-data'
+import { isRetiredWidgetType, parseStoredWidgets, storedWidgetSchema, widgetConfigSchema, widgetInstanceSchema } from '@shared/widget-data'
 import { createDebouncedWriter } from '@shared/debounced-writer'
 import { persistWidgets } from '../services/widget-persistence'
 import { withDesktopIconOperation } from '../services/desktop-icon-operations'
@@ -12,7 +12,6 @@ import { writeJsonAtomic } from '../runtime/atomicJson'
 import type { DesktopIconItem, DisplayBounds, DisplayDescriptor, WidgetInstance } from '@shared/types'
 import type { DesktopSceneLayoutPlan } from '@shared/desktop-scene-layout'
 import { findSmartWidgetPlacement } from '@shared/widget-placement'
-import { migrateTodoWidgetInstance } from '@shared/todo'
 import {
   DEFAULT_WIDGET_SIZE_BY_TYPE,
   getWidgetCapability,
@@ -32,7 +31,6 @@ import {
   setCanvasHitRegions,
   setCanvasMousePassthrough,
   setCanvasPointerActive,
-  setCanvasTextInputActive,
 } from '../windows/canvasWindow'
 import {
   getUserWallpaperFolderName,
@@ -42,6 +40,7 @@ import {
   getWallpaperWidgetOverridePath,
   isRemoteWallpaperId,
   isUserWallpaperId,
+  stableUserDataSegment,
 } from '../runtime/userDataPaths'
 import { getDesktopIconItems, restoreDesktopIconsForWidget } from './desktopIconIpc'
 import { assertTrustedIpcSender } from './ipcSecurity'
@@ -72,7 +71,8 @@ const DOCK_MIN_RESTORED_HEIGHT = 72
 const DOCK_BOTTOM_MARGIN = 72
 const GLOBAL_ICON_WIDGET_TYPES = ['desktop-icons-box', 'desktop-icons-horizontal', 'desktop-icons-adaptive', 'desktop-icons-dock']
 const MAX_DESKTOP_SCENE_SNAPSHOTS = 20
-const STICKY_NOTE_GRAB_EDGE = 42
+/** Built-in sticky notes moved to the separate LavaNotes app; old records are backed up, not loaded. */
+const LEGACY_STICKY_NOTE_TYPE = 'todo-board'
 const DEFAULT_DOCK_CONFIG: Record<string, unknown> = {
   items: [],
   dockStyle: 'glass',
@@ -85,11 +85,7 @@ const DEFAULT_DOCK_CONFIG: Record<string, unknown> = {
 }
 
 function canAddMultipleWidgetType(type: string): boolean {
-  return ['desktop-icons-box', 'desktop-icons-horizontal', 'desktop-icons-adaptive', 'generated-widget', 'todo-board'].includes(type)
-}
-
-function isFreeformStickyNote(type: string): boolean {
-  return type === 'todo-board'
+  return ['desktop-icons-box', 'desktop-icons-horizontal', 'desktop-icons-adaptive', 'generated-widget'].includes(type)
 }
 
 function isGlobalIconWidgetType(type: string): boolean {
@@ -120,7 +116,7 @@ function withDefaultWidgetConfig(widget: WidgetInstance): WidgetInstance {
 }
 
 function withDefaultWidgetConfigs(widgets: WidgetInstance[]): WidgetInstance[] {
-  return normalizeWidgetStackOrder(widgets.flatMap((widget) => migrateTodoWidgetInstance(withDefaultWidgetConfig(widget))))
+  return normalizeWidgetStackOrder(widgets.filter((widget) => !isRetiredWidgetType(widget.type)).map(withDefaultWidgetConfig))
 }
 
 function getWallpaperScopedWidgets(widgets: WidgetInstance[]): WidgetInstance[] {
@@ -247,6 +243,23 @@ function resolveGlobalIconWidgets(wallpaperWidgets: WidgetInstance[]): WidgetIns
   return legacyRuntimeIcons.length > 0 ? legacyRuntimeIcons : getIconWidgets(wallpaperWidgets)
 }
 
+/**
+ * Keep one copy of the retired built-in sticky notes of a namespace before the
+ * widget list stops carrying them. The notes are not migrated into LavaNotes.
+ */
+async function backupLegacyStickyNotes(namespace: string, widgets: readonly WidgetInstance[]): Promise<void> {
+  const seen = new Set<string>()
+  const notes = widgets.filter((widget) => {
+    if (widget.type !== LEGACY_STICKY_NOTE_TYPE || seen.has(widget.id)) return false
+    seen.add(widget.id)
+    return true
+  })
+  if (notes.length === 0) return
+  const target = join(app.getPath('userData'), 'legacy-sticky-notes', `${stableUserDataSegment(namespace, 'desktop')}.json`)
+  const exists = await fs.access(target).then(() => true, () => false)
+  if (!exists) await writeJsonAtomic(target, { savedAt: new Date().toISOString(), namespace, widgets: notes })
+}
+
 let namespaceLoad: Promise<unknown> = Promise.resolve()
 
 export function loadWidgetsForWallpaper(wallpaperId?: string): Promise<WidgetInstance[]> {
@@ -271,6 +284,11 @@ async function loadWidgetNamespace(wallpaperId?: string): Promise<WidgetInstance
   // Resolve the next configuration first. A corrupt file must not discard the
   // current desktop. Drain edits made while the next file was being read.
   if (widgetNamespaceInitialized) await flushPendingWidgetSave()
+  const legacySources = widgetNamespaceInitialized
+    ? wallpaperConfig.widgets
+    : [...wallpaperConfig.widgets, ...parseStoredWidgets(store.get('widgets'))]
+  await backupLegacyStickyNotes(wallpaperId ?? UNASSIGNED_WIDGET_NAMESPACE, legacySources)
+    .catch((error) => console.error('[widget] legacy sticky note backup failed:', error))
 
   const displays = getDisplayDescriptors()
   const primary = displays.find((display) => display.primary) ?? displays[0]
@@ -368,32 +386,6 @@ function getDockPlacement(width: number, height: number, widget?: WidgetInstance
   }
 }
 
-function clampStickyNotePosition(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  area: DisplayBounds = getPrimaryDisplay()?.bounds ?? { x: 0, y: 0, width: 1, height: 1 },
-): { x: number; y: number } {
-  return {
-    x: Math.round(Math.max(area.x - width + STICKY_NOTE_GRAB_EDGE, Math.min(x, area.x + area.width - STICKY_NOTE_GRAB_EDGE))),
-    y: Math.round(Math.max(area.y - height + STICKY_NOTE_GRAB_EDGE, Math.min(y, area.y + area.height - STICKY_NOTE_GRAB_EDGE))),
-  }
-}
-
-/** 新便利贴有意错落叠放，避免把“可重叠”又退化成普通组件自动排版。 */
-function findStickyNotePlacement(width: number, height: number, existing: WidgetInstance[]): { x: number; y: number } {
-  const primary = getPrimaryDisplay()
-  if (!primary) return { x: EDGE_PADDING, y: EDGE_PADDING }
-  const area = getDisplayLocalWorkArea(primary)
-  const count = getWidgetsForDisplay(existing, primary).filter((widget) => widget.type === 'todo-board' && widget.enabled).length
-  const column = count % 6
-  const row = Math.floor(count / 6) % 3
-  const x = Math.round(area.x + area.width * 0.66 - width / 2 + column * 28 - row * 36)
-  const y = Math.round(area.y + Math.min(150, area.height * 0.17) + column * 22 + row * 34)
-  return clampStickyNotePosition(x, y, width, height, { x: 0, y: 0, width: primary.bounds.width, height: primary.bounds.height })
-}
-
 /** 将坐标对齐到网格 */
 export function snapToGrid(x: number, y: number): { x: number; y: number } {
   return {
@@ -459,7 +451,7 @@ function resolvePosition(
 }
 
 function syncToCanvas(): void {
-  const list = store.get('widgets')
+  const list = store.get('widgets').filter((widget) => !isRetiredWidgetType(widget.type))
   const win = getCanvasWindow()
   if (!win || win.webContents.isDestroyed()) return
   const displays = getDisplayDescriptors()
@@ -489,18 +481,16 @@ function normalizeCanvasWidgetUpdate(incoming: WidgetInstance, stored: WidgetIns
   if (!targetDisplay) return incoming
   const displayArea = getDisplayCanvasBounds(targetDisplay, render)
   const canvasWidgets = materializeWidgetsForCanvas(stored, displays, render, mode)
-  const resolved = isFreeformStickyNote(incoming.type)
-    ? clampStickyNotePosition(incoming.x, incoming.y, incoming.width, incoming.height, displayArea)
-    : resolvePosition(
-        incoming.id,
-        incoming.x,
-        incoming.y,
-        incoming.width,
-        incoming.height,
-        canvasWidgets,
-        !canAddMultipleWidgetType(incoming.type),
-        displayArea,
-      )
+  const resolved = resolvePosition(
+    incoming.id,
+    incoming.x,
+    incoming.y,
+    incoming.width,
+    incoming.height,
+    canvasWidgets,
+    !canAddMultipleWidgetType(incoming.type),
+    displayArea,
+  )
   return persistWidgetFromCanvas({ ...incoming, ...resolved }, displays, render, mode)
 }
 
@@ -792,11 +782,9 @@ export function registerWidgetIpc(): void {
   })
 
   ipcMain.handle(IPC.WIDGET_ADD, (_e, w: WidgetInstance) => {
-    assertTrustedIpcSender(_e, ['main', 'canvas'])
+    assertTrustedIpcSender(_e, ['main'])
     w = widgetInstanceSchema.parse(w)
-    if (_e.sender.id === getCanvasWindow()?.webContents.id && w.type !== 'todo-board') {
-      throw new Error('画布窗口只能新增便利贴')
-    }
+    if (isRetiredWidgetType(w.type)) throw new Error('便利贴已移到独立的 LavaNotes')
     const list = store.get('widgets')
     // Most widget types are single-instance; icon storage containers can have multiple copies.
     if (!canAddMultipleWidgetType(w.type) && list.some((existing) => existing.type === w.type)) {
@@ -805,8 +793,6 @@ export function registerWidgetIpc(): void {
     const widget = bindWidgetToPrimary(withDefaultWidgetConfig(w))
     const placement = widget.type === 'desktop-icons-dock'
       ? getDockPlacement(widget.width, widget.height)
-      : isFreeformStickyNote(widget.type)
-        ? findStickyNotePlacement(widget.width, widget.height, list)
       : findPlacement(widget.width, widget.height, list)
     widget.x = placement.x
     widget.y = placement.y
@@ -815,7 +801,7 @@ export function registerWidgetIpc(): void {
     syncToCanvas()
     autoSaveToWallpaper()
     if (!isCanvasEditMode()) setCanvasMousePassthrough(true)
-    return _e.sender.id === getCanvasWindow()?.webContents.id ? getMaterializedWidgets(list) : list
+    return list
   })
 
   ipcMain.handle(IPC.WIDGET_REMOVE, async (_e, id: string) => {
@@ -836,23 +822,7 @@ export function registerWidgetIpc(): void {
     }
     // Late renderer updates after removal/switching must not recreate a widget.
     if (!list.some((widget) => widget.id === w.id)) return list
-    const updated = isFreeformStickyNote(w.type)
-      ? [...list.filter((item) => item.id !== w.id), mergeWidgetUpdate(list.find((item) => item.id === w.id) ?? w, w)]
-      : list.map((it) => (it.id === w.id ? mergeWidgetUpdate(it, w) : it))
-    persistWidgets(updated)
-    syncToCanvas()
-    autoSaveToWallpaper()
-    return updated
-  })
-
-  ipcMain.handle(IPC.WIDGET_BRING_TO_FRONT, (_e, id: string) => {
-    assertTrustedIpcSender(_e, ['main', 'canvas'])
-    id = z.string().min(1).max(160).parse(id)
-    const list = store.get('widgets')
-    const target = list.find((widget) => widget.id === id)
-    if (!target) return list
-    const updated = moveWidgetToFront(list, id)
-    if (updated === list) return list
+    const updated = list.map((it) => (it.id === w.id ? mergeWidgetUpdate(it, w) : it))
     persistWidgets(updated)
     syncToCanvas()
     autoSaveToWallpaper()
@@ -889,12 +859,6 @@ export function registerWidgetIpc(): void {
     assertTrustedIpcSender(_e, ['canvas'])
     const sanitized = sanitizeCanvasHitRegions(regions)
     if (sanitized) setCanvasHitRegions(_e.sender.id, sanitized)
-  })
-
-  ipcMain.handle(IPC.CANVAS_SET_TEXT_INPUT_ACTIVE, (_e, active: boolean) => {
-    assertTrustedIpcSender(_e, ['canvas'])
-    active = z.boolean().parse(active)
-    return setCanvasTextInputActive(active)
   })
 
   ipcMain.on(IPC.CANVAS_DIAGNOSTIC, (_e, event: string, details: Record<string, unknown>) => {
@@ -1005,8 +969,6 @@ export function addWidgetForTool(widget: WidgetInstance, options: { anchor?: Wid
     ? getDockPlacement(normalized.width, normalized.height)
     : options.anchor
       ? resolveAnchoredPosition(normalized, options.anchor, layoutSize, list)
-    : isFreeformStickyNote(normalized.type)
-      ? findStickyNotePlacement(normalized.width, normalized.height, list)
     : findPlacement(normalized.width, normalized.height, list)
   normalized.x = placement.x
   normalized.y = placement.y
@@ -1039,27 +1001,6 @@ export function updateWidgetConfigForTool(params: { id?: string; type?: string; 
   syncToCanvas()
   autoSaveToWallpaper()
   return { ok: true, widget: updated.find((item) => item.id === target.id), list: updated }
-}
-
-export function updateWidgetForTool(params: {
-  id: string
-  config?: Record<string, unknown>
-  enabled?: boolean
-}): { ok: boolean; widget?: WidgetInstance; list: WidgetInstance[]; error?: string } {
-  const list = withDefaultWidgetConfigs(store.get('widgets'))
-  const target = list.find((item) => item.id === params.id)
-  if (!target) return { ok: false, list, error: 'widget-not-found' }
-
-  const nextWidget: WidgetInstance = {
-    ...target,
-    enabled: params.enabled ?? target.enabled,
-    config: params.config ? mergeConfigUpdate(target, params.config) : target.config,
-  }
-  const updated = list.map((item) => item.id === target.id ? nextWidget : item)
-  persistWidgets(updated)
-  syncToCanvas()
-  autoSaveToWallpaper()
-  return { ok: true, widget: nextWidget, list: updated }
 }
 
 /** Fit-content widgets (clocks, weather, text) have no stored size until the user resizes them. */
@@ -1100,9 +1041,6 @@ function placeWidgetOnDisplay(
   list: WidgetInstance[],
   context: WidgetDisplayContext,
 ): { x: number; y: number } {
-  if (isFreeformStickyNote(widget.type)) {
-    return clampStickyNotePosition(position.x, position.y, size.width, size.height, context.bounds)
-  }
   const neighbours = getWidgetsForDisplay(list, context.display).map((item) => (
     item.width > 0 && item.height > 0 ? item : { ...item, ...fitContentSize(item) }
   ))

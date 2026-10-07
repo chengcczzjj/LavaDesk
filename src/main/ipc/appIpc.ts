@@ -9,6 +9,10 @@ import { getLaunchAtLoginStatus, setLaunchAtLoginEnabled } from '../services/lau
 import { checkForAppUpdates, downloadAppUpdate, getAppUpdateStatus, installDownloadedUpdate } from '../services/update-service'
 import { toggleWindowsDesktop } from '../windows/windowsDesktop'
 import { logDockDiagnostic } from '../runtime/diagnosticLog'
+import { getLavaNotesStatus, openLavaNotes, openLavaNotesDownload } from '../services/lavanotes-service'
+import type { LavaNotesCommand } from '@shared/types'
+
+const LAVANOTES_COMMANDS: readonly LavaNotesCommand[] = ['new', 'open', 'manager']
 
 function showMainWindow(target?: MainWindowNavTarget): void {
   const win = getMainWindow() ?? createMainWindow(target)
@@ -64,7 +68,7 @@ export function registerAppIpc(): void {
     const messageOptions: Electron.MessageBoxOptions = {
       type: 'question',
       title: '允许精准定位',
-      message: '允许灵月使用设备精准位置吗？',
+      message: '允许 LavaDesk 使用设备精准位置吗？',
       detail: '开启后，AI 的天气和位置相关工具可以使用设备/系统定位返回的坐标。关闭时只使用粗略城市级位置。',
       buttons: ['允许', '取消'],
       defaultId: 0,
@@ -89,6 +93,20 @@ export function registerAppIpc(): void {
     } catch {
       return false
     }
+  })
+  ipcMain.handle(IPC.LAVANOTES_STATUS, (event) => {
+    assertTrustedIpcSender(event, ['main'])
+    return getLavaNotesStatus()
+  })
+  ipcMain.handle(IPC.LAVANOTES_OPEN, (event, command: unknown) => {
+    assertTrustedIpcSender(event, ['main'])
+    if (!LAVANOTES_COMMANDS.includes(command as LavaNotesCommand)) throw new Error('invalid LavaNotes command')
+    return openLavaNotes(command as LavaNotesCommand)
+  })
+  ipcMain.handle(IPC.LAVANOTES_DOWNLOAD, async (event) => {
+    assertTrustedIpcSender(event, ['main'])
+    await openLavaNotesDownload()
+    return true
   })
   ipcMain.on(IPC.APP_QUIT, (event) => { assertTrustedIpcSender(event, ['main']); app.quit() })
   ipcMain.on(IPC.APP_SHOW_MAIN, (event) => {

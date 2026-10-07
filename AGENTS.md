@@ -1,4 +1,4 @@
-# 灵月桌面 Agent 开发指引
+# LavaDesk Agent 开发指引
 
 本文件是 Codex、VSCode/Copilot 等开发智能体的统一规则入口。它管理的是工程协作，不是应用内 AI 伴侣的人设或用户长期记忆。
 
@@ -12,7 +12,7 @@
 
 ## 项目背景与上下文
 
-灵月桌面（LingyueDesk）是 Windows 桌面 AI 伴侣应用，主线为壁纸、桌面组件、陪伴式对话与桌宠；复杂工作区 Agent 作为高级辅助保留。依赖版本以 `package.json` / `package-lock.json` 为准，不在规则入口重复写版本号。
+LavaDesk（1.2.0 前名为灵月桌面 / LingyueDesk）是 Windows 桌面 AI 伴侣应用，主线为壁纸、桌面组件、陪伴式对话与桌宠；复杂工作区 Agent 作为高级辅助保留。AI 伴侣仍叫“灵月”。便签已拆分为独立开源软件 [LavaNotes](https://github.com/chengcczzjj/LavaNotes)，本仓库只负责检测和唤起它。内部标识 `window.lingyue`、`--lingyue-window-role`、`lyasset://` 和 localStorage 键沿用旧名，改动会丢失已保存的界面状态，非必要不改。依赖版本以 `package.json` / `package-lock.json` 为准，不在规则入口重复写版本号。
 
 开始非简单任务前：
 - 先读 [项目状态](TempFile/文档资料/project-status.md)，了解当前模块状态、验证边界和已知缺口。

@@ -1,4 +1,4 @@
-# Copilot Agent Instructions - 灵月桌面
+# Copilot Agent Instructions - LavaDesk
 
 本文件只适配 VSCode/Copilot 入口，不维护第二套工程规则。
 

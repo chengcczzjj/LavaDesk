@@ -120,10 +120,25 @@ test('Dock restore failure keeps managed records and concurrent edits; successfu
   assert.deepEqual(f.state.widgets.map((w) => w.id), ['other'])
 })
 
-test('late todo update cannot resurrect a removed component', async (t) => {
+test('late update cannot resurrect a removed component', async (t) => {
   const f = await desktopFixture(t)
-  f.invoke('WIDGET_UPDATE', widget('removed', { type: 'todo-board' }))
+  f.invoke('WIDGET_UPDATE', widget('removed', { type: 'text' }))
   assert.deepEqual(f.state.widgets, [])
+})
+
+test('retired built-in sticky notes leave the desktop but are backed up once first', async (t) => {
+  const note = widget('note', { type: 'todo-board', config: { version: 2, bodyHtml: '<p>keep me</p>' } })
+  const f = await desktopFixture(t)
+  const a = await f.addWallpaper('A', [widget('a'), note])
+  await f.invoke('WALLPAPER_APPLY', a)
+  assert.deepEqual(f.state.widgets.map((w) => w.id), ['a'])
+  assert.deepEqual(f.invoke('WIDGET_LIST').map((w) => w.id), ['a'])
+  const dir = join(f.userData, 'legacy-sticky-notes')
+  const [file] = await fs.readdir(dir)
+  const backup = JSON.parse(await fs.readFile(join(dir, file), 'utf8'))
+  assert.equal(backup.namespace, 'A')
+  assert.deepEqual(backup.widgets.map((w) => [w.id, w.config.bodyHtml]), [['note', '<p>keep me</p>']])
+  assert.throws(() => f.invoke('WIDGET_ADD', widget('new-note', { type: 'todo-board' })), /LavaNotes/)
 })
 
 test('display mode and primary topology changes reconcile effective wallpaper and component namespace', async (t) => {
@@ -206,9 +221,9 @@ test('atomic save failure preserves original override and cleans temporary files
 })
 
 test('IPC rejects count growth, duplicate IDs and merged-config growth but permits moving legacy data', async (t) => {
-  const items = Array.from({ length: 200 }, (_, i) => widget('w-' + i, { type: 'todo-board' }))
+  const items = Array.from({ length: 200 }, (_, i) => widget('w-' + i, { type: 'generated-widget' }))
   const f = await desktopFixture(t, { initial: { widgets: items } })
-  assert.throws(() => f.invoke('WIDGET_ADD', widget('extra', { type: 'todo-board' })), /200/)
+  assert.throws(() => f.invoke('WIDGET_ADD', widget('extra', { type: 'generated-widget' })), /200/)
   assert.throws(() => f.invoke('WIDGET_ADD', items[0]), /200|ID/)
   f.state.widgets = [widget('large', { config: { before: 'x'.repeat(350 * 1024) } })]
   assert.throws(() => f.invoke('WIDGET_UPDATE_CONFIG', 'large', { after: 'y'.repeat(350 * 1024) }), /512KB/)

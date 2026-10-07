@@ -105,7 +105,7 @@ function notifyUpdateReady(version: string): void {
   notifiedDownloadedVersion = version
   try {
     const notification = new Notification({
-      title: '灵月桌面已准备好更新',
+      title: 'LavaDesk 已准备好更新',
       body: `新版本 v${version} 已下载完成。点击这里重启完成更新，也可以稍后从托盘菜单更新。`,
       silent: true,
     })

@@ -10,14 +10,17 @@ test('stable release metadata and updater publishing stay wired together', async
   const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
   const builderConfig = await readFile(new URL('../electron-builder.yml', import.meta.url), 'utf8')
 
-  assert.equal(packageJson.version, '1.1.13')
+  assert.equal(packageJson.version, '1.2.0')
+  // productName decides the userData folder; the LingyueDesk data migration copies into it.
+  assert.equal(packageJson.productName, 'LavaDesk')
   assert.ok(packageJson.dependencies['electron-updater'])
   assert.match(packageJson.scripts['build:win'], /electron-builder --win/)
   assert.match(packageJson.scripts['build:win'], /signExecutable=false/)
   assert.match(builderConfig, /provider: github/)
   assert.match(builderConfig, /owner: chengcczzjj/)
-  assert.match(builderConfig, /repo: FlowWallDesk/)
-  assert.match(builderConfig, /artifactName: \$\{name\}-\$\{version\}-setup\.\$\{ext\}/)
+  assert.match(builderConfig, /repo: LavaDesk/)
+  assert.match(builderConfig, /appId: com\.lavadesk\.app/)
+  assert.match(builderConfig, /artifactName: LavaDesk-Setup-\$\{version\}\.\$\{ext\}/)
   assert.match(builderConfig, /- out\/main\/\*\*\/\*/)
   assert.match(builderConfig, /- out\/preload\/\*\*\/\*/)
   assert.match(builderConfig, /- out\/renderer\/\*\*\/\*/)
@@ -36,7 +39,9 @@ test('update and launch-at-login IPC channels are unique and complete', () => {
     IPC.APP_UPDATE_DOWNLOAD,
     IPC.APP_UPDATE_INSTALL,
     IPC.APP_UPDATE_STATE_CHANGED,
-    IPC.WIDGET_BRING_TO_FRONT,
+    IPC.LAVANOTES_STATUS,
+    IPC.LAVANOTES_OPEN,
+    IPC.LAVANOTES_DOWNLOAD,
   ]) {
     assert.ok(channels.includes(channel))
   }
@@ -105,7 +110,6 @@ test('updates are user-started from the activity sidebar and restart after downl
 test('desktop icon launches stay bound to their persisted widget record', async () => {
   const preloadSource = await readFile(new URL('../src/preload/canvas.ts', import.meta.url), 'utf8')
   const ipcSource = await readFile(new URL('../src/main/ipc/desktopIconIpc.ts', import.meta.url), 'utf8')
-  const widgetIpcSource = await readFile(new URL('../src/main/ipc/widgetIpc.ts', import.meta.url), 'utf8')
   const canvasSource = await readFile(new URL('../src/main/windows/canvasWindow.ts', import.meta.url), 'utf8')
   const rendererCanvasSource = await readFile(new URL('../src/renderer/canvas/Canvas.tsx', import.meta.url), 'utf8')
   const diagnosticSource = await readFile(new URL('../src/main/runtime/diagnosticLog.ts', import.meta.url), 'utf8')
@@ -126,10 +130,7 @@ test('desktop icon launches stay bound to their persisted widget record', async 
   assert.match(canvasSource, /CURSOR_HIT_TEST_ACTIVE_INTERVAL_MS = 25/)
   assert.match(canvasSource, /CURSOR_HIT_TEST_IDLE_INTERVAL_MS = 80/)
   assert.match(canvasSource, /scheduleCanvasCursorHitTest\(\)/)
-  assert.match(rendererCanvasSource, /bringWidgetToFront\(id\)/)
   assert.match(rendererCanvasSource, /zIndex: stackOrder/)
-  assert.match(widgetIpcSource, /WIDGET_BRING_TO_FRONT/)
-  assert.match(preloadSource, /bringWidgetToFront: \(id: string\)/)
   assert.match(canvasSource, /CANVAS_NATIVE_DOCK_CLICK/)
   assert.match(canvasSource, /shouldFallbackNativeDockClick/)
   assert.match(canvasSource, /WindowFromPoint/)

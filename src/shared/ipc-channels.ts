@@ -24,6 +24,10 @@ export const IPC = {
   APP_REQUEST_PRECISE_LOCATION_AUTHORIZATION: 'app:request-precise-location-authorization',
   APP_VALIDATE_PRECISE_LOCATION: 'app:validate-precise-location',
   APP_OPEN_LOCATION_SETTINGS: 'app:open-location-settings',
+  // 主界面 → 主进程：独立便签软件 LavaNotes 的检测、唤起与下载
+  LAVANOTES_STATUS: 'lavanotes:status',
+  LAVANOTES_OPEN: 'lavanotes:open',
+  LAVANOTES_DOWNLOAD: 'lavanotes:download',
   WIN_MINIMIZE: 'win:minimize',
   WIN_MAXIMIZE_TOGGLE: 'win:maximize-toggle',
   WIN_CLOSE: 'win:close',
@@ -70,7 +74,6 @@ export const IPC = {
   WIDGET_ADD: 'widget:add',
   WIDGET_REMOVE: 'widget:remove',
   WIDGET_UPDATE: 'widget:update',
-  WIDGET_BRING_TO_FRONT: 'widget:bring-to-front',
   WIDGET_UPDATE_CONFIG: 'widget:update-config',
   WIDGET_CONFIG_SAVE: 'widget:config-save',
   WIDGET_CONFIG_LOAD: 'widget:config-load',
@@ -86,8 +89,6 @@ export const IPC = {
   CANVAS_SET_IGNORE_MOUSE: 'canvas:set-ignore-mouse',
   // 画布 → 主进程：指针手势生命周期，防止拖拽中途穿透
   CANVAS_SET_POINTER_ACTIVE: 'canvas:set-pointer-active',
-  // 画布 → 主进程：桌面内联输入临时获取键盘焦点，不进入全局编辑模式
-  CANVAS_SET_TEXT_INPUT_ACTIVE: 'canvas:set-text-input-active',
   // 画布 → 主进程：Dock 交互链路持久化诊断事件
   CANVAS_DIAGNOSTIC: 'canvas:diagnostic',
   // 主进程 -> 画布：Windows 透明窗口丢失 pointerdown 时的 Dock 单击兜底

@@ -293,7 +293,6 @@ function applyCanvasMousePassthrough(): void {
     desktopOccluded,
     recompositing: canvasRecompositing,
     editing: isEditing,
-    textInputActive: canvasTextInputActive,
     pointerActive: rendererPointerActive,
     cursorWidgetId,
     rendererHoverHint,
@@ -305,7 +304,7 @@ function applyCanvasMousePassthrough(): void {
  * Electron's Windows implementation of setFocusable() also calls
  * SetSkipTaskbar(!focusable) and Deactivate(). Deactivate hands the foreground
  * to whichever window sits below the canvas, so calling it on every occlusion
- * change or sticky-note edit stole focus from the app the user just opened and
+ * change stole focus from the app the user just opened and
  * flashed a canvas button on the taskbar. Only touch it on real transitions and
  * immediately remove the transient taskbar tab again.
  */
@@ -314,18 +313,6 @@ function setCanvasFocusable(win: BrowserWindow, focusable: boolean): void {
   canvasFocusable = focusable
   win.setFocusable(focusable)
   win.setSkipTaskbar(true)
-}
-
-/** Give the canvas keyboard focus for inline text input without lifting it above other apps. */
-function focusCanvasForTextInput(win: BrowserWindow): void {
-  setCanvasFocusable(win, true)
-  win.focus()
-  win.webContents.focus()
-  // Chromium's Activate() raises the window to HWND_TOP. The canvas is a
-  // full-screen transparent layer, so staying there would put every widget
-  // above the user's apps while they type. Z-order changes with
-  // SWP_NOACTIVATE keep the keyboard focus.
-  settleCanvasOnDesktop(win)
 }
 
 function isCoveredCursorSurface(surface: NativeCursorSurface | null): boolean {
@@ -621,8 +608,7 @@ function refreshCanvasCursorHitTest(): void {
 }
 
 function getCursorHitTestInterval(): number {
-  return nativeLeftButtonDown || rendererPointerActive || cursorWidgetId !== null || cursorInsideWidgetRegion ||
-    canvasTextInputActive || isEditing
+  return nativeLeftButtonDown || rendererPointerActive || cursorWidgetId !== null || cursorInsideWidgetRegion || isEditing
     ? CURSOR_HIT_TEST_ACTIVE_INTERVAL_MS
     : CURSOR_HIT_TEST_IDLE_INTERVAL_MS
 }
@@ -749,7 +735,7 @@ function recoverCanvasAfterDesktopReturn(): void {
   if (desktopReturnRecoveryTimer) clearTimeout(desktopReturnRecoveryTimer)
   desktopReturnRecoveryTimer = setTimeout(() => {
     desktopReturnRecoveryTimer = null
-    if (cursorWidgetId || rendererPointerActive || canvasTextInputActive) return
+    if (cursorWidgetId || rendererPointerActive) return
     refreshCanvasZOrder('desktop-return-settled')
   }, 360)
 }
@@ -791,7 +777,6 @@ function commitDesktopOcclusion(occluded: boolean): void {
   notifyCanvasPointerOccluded(false)
   if (occluded) {
     cancelCanvasZOrderRefresh()
-    canvasTextInputActive = false
     const canvas = getCanvasWindow()
     if (canvas && !isEditing && canvasFocusable) {
       // Park the canvas above the desktop shell first so the Deactivate() side
@@ -856,7 +841,6 @@ let desktopOccludedSince = 0
 let initialOcclusionCanvasAgeMs = Number.POSITIVE_INFINITY
 let rendererPointerDownObservedSinceCreation = false
 let lastRendererPointerDownAt = 0
-let canvasTextInputActive = false
 let rendererMousePassthrough = true
 let rendererMousePassthroughAt = 0
 let rendererPointerActive = false
@@ -1039,7 +1023,6 @@ export function createCanvasWindow(): BrowserWindow {
   rendererMousePassthroughAt = Date.now()
   rendererPointerActive = false
   rendererPointerReleaseCandidateAt = 0
-  canvasTextInputActive = false
   nativeMousePassthrough = null
   cursorWidgetId = null
   nativeLeftButtonDown = false
@@ -1123,7 +1106,6 @@ export function createCanvasWindow(): BrowserWindow {
     cancelCanvasZOrderRefresh()
     rendererPointerActive = false
     rendererPointerReleaseCandidateAt = 0
-    canvasTextInputActive = false
     nativeMousePassthrough = null
     cursorWidgetId = null
     nativeLeftButtonDown = false
@@ -1201,10 +1183,6 @@ export function setCanvasPointerActive(active: boolean): void {
   }
   logDockDiagnostic('canvas.pointer-active-changed', { active, cursorWidgetId })
   applyCanvasMousePassthrough()
-  // A click into the focused canvas can re-raise it above other apps while a
-  // sticky note is being edited; return it to the desktop layer.
-  const win = getCanvasWindow()
-  if (win && canvasTextInputActive && !isEditing) sendToBottom(win)
   restartCanvasCursorHitTest()
 }
 
@@ -1219,35 +1197,6 @@ export function setCanvasHitRegions(webContentsId: number, regions: CanvasHitReg
   const win = getCanvasWindow()
   if (!win || win.webContents.id !== webContentsId) return
   rendererHitRegions = regions
-}
-
-/** 只为桌面内联编辑临时开启键盘焦点，不改变组件层级或全局编辑状态。 */
-export function setCanvasTextInputActive(active: boolean): boolean {
-  const win = getCanvasWindow()
-  if (!win || (desktopOccluded && active)) return false
-  if (isEditing) return true
-  if (canvasTextInputActive === active) {
-    if (active && !win.isFocused()) focusCanvasForTextInput(win)
-    return true
-  }
-
-  canvasTextInputActive = active
-  rendererMousePassthrough = !active
-  rendererMousePassthroughAt = Date.now()
-  if (active) {
-    cancelCanvasZOrderRefresh()
-    focusCanvasForTextInput(win)
-    applyCanvasMousePassthrough()
-  } else {
-    // Settle first: setFocusable(false) activates the window below the canvas,
-    // which must be the desktop shell rather than an unrelated app.
-    settleCanvasOnDesktop(win)
-    setCanvasFocusable(win, false)
-    applyCanvasMousePassthrough()
-  }
-  logDockDiagnostic('canvas.text-input-active-changed', { active })
-  restartCanvasCursorHitTest()
-  return true
 }
 
 export function noteCanvasRendererActionPointerDown(): void {
@@ -1274,7 +1223,6 @@ export function setCanvasEditMode(on: boolean): void {
   if (!canvasWindow || canvasWindow.isDestroyed()) return
   cancelCanvasZOrderRefresh()
   isEditing = on
-  canvasTextInputActive = false
   if (on) {
     // 最小化其他所有普通窗口，露出桌面组件
     minimizeAllOtherWindows()
@@ -1364,7 +1312,7 @@ export function minimizeAllOtherWindows(): void {
  */
 export function refreshCanvasZOrder(reason = 'requested'): void {
   const win = getCanvasWindow()
-  if (!win || desktopOccluded || isEditing || canvasTextInputActive) return
+  if (!win || desktopOccluded || isEditing) return
 
   const generation = ++zOrderRefreshGeneration
   if (zOrderRefreshTimer) clearTimeout(zOrderRefreshTimer)
@@ -1387,7 +1335,7 @@ export function refreshCanvasZOrder(reason = 'requested'): void {
       canvasRecompositing = false
       return
     }
-    if (desktopOccluded || isEditing || canvasTextInputActive) {
+    if (desktopOccluded || isEditing) {
       canvasRecompositing = false
       applyCanvasMousePassthrough()
       return

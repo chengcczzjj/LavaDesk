@@ -172,7 +172,7 @@ function githubHeaders(token: string, extra?: Record<string, string>): Record<st
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,
     'X-GitHub-Api-Version': GITHUB_API_VERSION,
-    'User-Agent': 'LingyueDesk-Wallpaper-Publisher',
+    'User-Agent': 'LavaDesk-Wallpaper-Publisher',
     ...extra,
   }
 }
@@ -227,7 +227,7 @@ async function validateRepositoryAccess(config: StoredOwnerConfig, createIfMissi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: OFFICIAL_WALLPAPER_REPOSITORY.split('/')[1],
-          description: 'Official wallpaper packages and manifest for LingyueDesk.',
+          description: 'Official wallpaper packages and manifest for LavaDesk.',
           private: false,
           auto_init: true,
         }),
@@ -237,7 +237,7 @@ async function validateRepositoryAccess(config: StoredOwnerConfig, createIfMissi
         `/repos/${OFFICIAL_WALLPAPER_REPOSITORY}`,
       )
     } catch {
-      throw new Error('官方壁纸仓库尚不存在；请先在 GitHub 创建公开仓库 LingyueDesk-Wallpapers，或使用具备仓库创建权限的 Token')
+      throw new Error('官方壁纸仓库尚不存在；请先在 GitHub 创建公开仓库 LavaDesk-Wallpapers，或使用具备仓库创建权限的 Token')
     }
   }
   if (!repo) throw new Error('官方壁纸仓库不存在')
@@ -396,7 +396,7 @@ async function getOrCreateRelease(config: StoredOwnerConfig, tag: string): Promi
         tag_name: tag,
         target_commitish: config.branch,
         name: tag,
-        body: 'LingyueDesk 在线壁纸资源包。',
+        body: 'LavaDesk 在线壁纸资源包。',
         draft: false,
         prerelease: false,
       }),

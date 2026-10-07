@@ -12,5 +12,5 @@ if (role === 'main') {
 } else if (role === 'wallpaper') {
   exposeWallpaperApi()
 } else {
-  throw new Error('缺少有效的灵月窗口角色，preload 已拒绝暴露 IPC bridge。')
+  throw new Error('缺少有效的 LavaDesk 窗口角色，preload 已拒绝暴露 IPC bridge。')
 }

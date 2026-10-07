@@ -254,7 +254,7 @@ async function duckDuckGoInstantAnswer(query: string): Promise<string> {
   })
 
   const res = await fetchWithTimeout(`https://api.duckduckgo.com/?${params.toString()}`, {
-    headers: { 'User-Agent': 'LingyueDesk/1.0' },
+    headers: { 'User-Agent': 'LavaDesk/1.0' },
   })
   if (!res.ok) return ''
 

@@ -29,10 +29,9 @@ import {
   PanelBottom,
   Trash2,
   Sparkles,
-  ClipboardCheck,
 } from 'lucide-react'
 import { getStylesForType } from '../../widgets/shared/constants'
-import { TodoNotesManager } from './widgets/TodoNotesManager'
+import { LavaNotesPanel } from './widgets/LavaNotesPanel'
 
 /* ============================
    组件目录定义 — 严格对齐 demo
@@ -96,14 +95,6 @@ const ICON_WIDGETS: WidgetCatalogItem[] = [
   { type: 'desktop-icons-dock', name: '桌面 Dock', icon: <PanelBottom size={20} />, size: 'medium', floating: true },
 ]
 
-const TODO_WIDGET: WidgetCatalogItem = {
-  type: 'todo-board',
-  name: '自由便利贴',
-  icon: <ClipboardCheck size={20} />,
-  size: 'large',
-  floating: true,
-}
-
 /** 悬浮组件在桌面上的默认尺寸（0 表示 fit-content 自适应） */
 const FLOATING_DESKTOP_SIZES: Record<string, { w: number; h: number }> = {
   clock: { w: 0, h: 0 },
@@ -114,7 +105,6 @@ const FLOATING_DESKTOP_SIZES: Record<string, { w: number; h: number }> = {
   weather: { w: 0, h: 0 },
   whitenoise: { w: 0, h: 0 },
   text: { w: 0, h: 0 },
-  'todo-board': { w: 220, h: 190 },
   'desktop-icons-box': { w: 246, h: 344 },
   'desktop-icons-horizontal': { w: 356, h: 242 },
   'desktop-icons-adaptive': { w: 246, h: 242 },
@@ -123,7 +113,7 @@ const FLOATING_DESKTOP_SIZES: Record<string, { w: number; h: number }> = {
 const DOCK_BOTTOM_MARGIN = 72
 
 function canAddMultipleWidgetType(type: string): boolean {
-  return ['desktop-icons-box', 'desktop-icons-horizontal', 'desktop-icons-adaptive', 'todo-board'].includes(type)
+  return ['desktop-icons-box', 'desktop-icons-horizontal', 'desktop-icons-adaptive'].includes(type)
 }
 
 /** 新闻来源选项 */
@@ -279,14 +269,7 @@ export function WidgetsPage({ subPage }: { subPage: string }) {
   return (
     <div className="widgets-page">
       <div className="widgets-main">
-        {subPage === 'widgets-tasks' && (
-          <TodoNotesManager
-            instances={instances}
-            onCreate={(config) => addToDesktop(TODO_WIDGET, { ...config })}
-            onRemove={removeInstanceFromDesktop}
-            onRefresh={refresh}
-          />
-        )}
+        {subPage === 'widgets-tasks' && <LavaNotesPanel />}
         {subPage === 'widgets-floating' && (
           <>
             <div className="nobg-grid">

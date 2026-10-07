@@ -45,7 +45,6 @@ const api = {
     return () => ipcRenderer.off(IPC.CANVAS_POINTER_RESET, handler)
   },
   getWidgets: (): Promise<WidgetInstance[]> => ipcRenderer.invoke(IPC.WIDGET_LIST),
-  addWidget: (w: WidgetInstance): Promise<WidgetInstance[]> => ipcRenderer.invoke(IPC.WIDGET_ADD, w),
   getFilePath: (file: File): string | undefined => {
     try {
       return webUtils.getPathForFile(file)
@@ -74,13 +73,10 @@ const api = {
     ipcRenderer.on(IPC.CANVAS_POINTER_OCCLUDED, handler)
     return () => ipcRenderer.off(IPC.CANVAS_POINTER_OCCLUDED, handler)
   },
-  setTextInputActive: (active: boolean): Promise<boolean> =>
-    ipcRenderer.invoke(IPC.CANVAS_SET_TEXT_INPUT_ACTIVE, active),
   logDiagnostic: (event: string, details: Record<string, unknown> = {}): void => {
     ipcRenderer.send(IPC.CANVAS_DIAGNOSTIC, event, details)
   },
   updateWidget: (w: WidgetInstance) => ipcRenderer.invoke(IPC.WIDGET_UPDATE, w),
-  bringWidgetToFront: (id: string): Promise<WidgetInstance[]> => ipcRenderer.invoke(IPC.WIDGET_BRING_TO_FRONT, id),
   /** 仅更新组件 config（不触发位置吸附） */
   updateWidgetConfig: (id: string, config: Record<string, unknown>) =>
     ipcRenderer.invoke(IPC.WIDGET_UPDATE_CONFIG, id, config),

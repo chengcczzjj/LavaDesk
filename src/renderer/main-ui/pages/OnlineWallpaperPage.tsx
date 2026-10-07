@@ -173,7 +173,7 @@ export function OnlineWallpaperPage({
     <div className="online-wallpaper-page">
       <header className="online-library-hero">
         <div>
-          <div className="online-library-hero__eyebrow">灵月在线壁纸</div>
+          <div className="online-library-hero__eyebrow">LavaDesk 在线壁纸</div>
           <h1>在线壁纸库</h1>
           <p>壁纸资源独立下载和更新，不再跟随整个应用安装包。</p>
         </div>
@@ -258,7 +258,7 @@ export function OnlineWallpaperPage({
                     <h2 title={item.title}>{item.title}</h2>
                     <span>{formatBytes(item.size)}</span>
                   </div>
-                  <p>{item.description || item.tags?.join(' · ') || '灵月在线壁纸资源'}</p>
+                  <p>{item.description || item.tags?.join(' · ') || 'LavaDesk 在线壁纸资源'}</p>
                   <div className="online-wallpaper-card__meta">
                     <span className={`resource-state resource-state--${item.installState}`}>{stateLabel(item)}</span>
                     {item.author && <span title={item.author}>{item.author}</span>}

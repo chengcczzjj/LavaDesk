@@ -27,7 +27,7 @@ import { beginWallpaperResourceMutation } from './wallpaper-usage'
 import { getMainWindow } from '../windows/mainWindow'
 import { extractZipSafely } from './safe-zip'
 
-export const OFFICIAL_WALLPAPER_REPOSITORY = 'chengcczzjj/LingyueDesk-Wallpapers'
+export const OFFICIAL_WALLPAPER_REPOSITORY = 'chengcczzjj/LavaDesk-Wallpapers'
 export const OFFICIAL_WALLPAPER_MANIFEST_URL =
   `https://raw.githubusercontent.com/${OFFICIAL_WALLPAPER_REPOSITORY}/main/manifest.json`
 

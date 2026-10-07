@@ -1,10 +1,11 @@
 {
-  "name": "lingyue-desk",
-  "version": "1.1.13",
+  "name": "lava-desk",
+  "productName": "LavaDesk",
+  "version": "1.2.0",
   "private": true,
-  "description": "灵月 — Windows 桌面 AI 伴侣（动态壁纸 / 桌面组件 / 桌宠）",
+  "description": "LavaDesk — Windows 桌面 AI 伴侣（动态壁纸 / 桌面组件 / 桌宠）",
   "main": "./out/main/index.js",
-  "author": "LingyueDesk",
+  "author": "chengcczzjj",
   "license": "MIT",
   "scripts": {
     "dev": "chcp 65001 >nul && cross-env ELECTRON_DISABLE_SANDBOX=1 electron-vite dev -w",

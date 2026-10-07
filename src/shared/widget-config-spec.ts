@@ -8,10 +8,6 @@ import type { WidgetTypeId } from './desktop-scene'
  * writing keys the widget ignores (and leaving it on its default look).
  */
 
-/** Same values as TODO_NOTE_COLORS / TODO_NOTE_PAPER_STYLES in todo.ts (kept in sync by tests; shared modules stay import-free for the node test runner). */
-const TODO_NOTE_COLOR_OPTIONS = ['butter', 'rose', 'mint', 'sky', 'lilac'] as const
-const TODO_NOTE_PAPER_STYLE_OPTIONS = ['tape', 'pin', 'plain'] as const
-
 /** Ids of COLOR_THEMES in src/renderer/widgets/shared/constants.tsx (kept in sync by tests). */
 export const WIDGET_THEME_IDS = [
   'white', 'black', 'orange', 'blue', 'purple', 'green', 'pink',
@@ -61,11 +57,6 @@ export const WIDGET_CONFIG_SPECS: Readonly<Record<WidgetTypeId, Spec>> = {
     text: { kind: 'string', label: '文字', maxLength: 120 },
     author: { kind: 'string', label: '署名', maxLength: 40 },
   },
-  'todo-board': {
-    color: { kind: 'enum', label: '纸张颜色', options: TODO_NOTE_COLOR_OPTIONS },
-    paperStyle: { kind: 'enum', label: '固定方式', options: TODO_NOTE_PAPER_STYLE_OPTIONS },
-    rotation: { kind: 'number', label: '自然倾斜角度', min: -4, max: 4, description: '单位：度，保持轻微倾斜更像真实纸张' },
-  },
   stocks: {
     refreshInterval: { kind: 'number', label: '刷新间隔（秒）', min: 10, max: 3600, integer: true },
   },
@@ -95,7 +86,6 @@ export const WIDGET_CONFIG_SPECS: Readonly<Record<WidgetTypeId, Spec>> = {
 
 /** Config that has its own structured tool; generic config edits must not touch it. */
 export const WIDGET_CONFIG_MANAGED_BY: Partial<Record<WidgetTypeId, string>> = {
-  'todo-board': '任务内容用 manage_todo_tasks 管理',
   stocks: '股票列表通过 add_widget 的 stockSymbols 设置',
   'generated-widget': '内容用 update_generated_widget 修改',
   pet: '桌宠外观在“桌宠”页面设置',

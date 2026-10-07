@@ -43,9 +43,6 @@ test('AI widget settings match what the desktop toolbar offers and the widgets r
 })
 
 test('every built-in preset only uses real settings', async () => {
-  const { TODO_NOTE_COLORS, TODO_NOTE_PAPER_STYLES } = await import('../src/shared/todo.ts')
-  assert.deepEqual([...WIDGET_CONFIG_SPECS['todo-board'].color.options], TODO_NOTE_COLORS)
-  assert.deepEqual([...WIDGET_CONFIG_SPECS['todo-board'].paperStyle.options], TODO_NOTE_PAPER_STYLES)
   for (const capability of WIDGET_CAPABILITIES) {
     assert.equal('configSchema' in capability, false, 'stale capability config schema must not come back')
     for (const preset of capability.presets) {
@@ -75,7 +72,8 @@ test('config patches are validated, normalised and explained', () => {
 
   // Summaries never echo heavy payloads such as icon lists or note HTML.
   assert.deepEqual(pickWidgetSettings('desktop-icons-dock', { items: [{ icon: 'data:...' }], dockOpacity: 0.1 }), { dockOpacity: 0.1 })
-  assert.deepEqual(pickWidgetSettings('todo-board', { bodyHtml: '<img src="data:...">', color: 'mint' }), { color: 'mint' })
+  // Sticky notes moved to the separate LavaNotes app; the AI cannot create the old widget.
+  assert.equal(WIDGET_TYPES.includes('todo-board'), false)
 })
 
 test('generated cards size to their content and keep accent text readable', () => {

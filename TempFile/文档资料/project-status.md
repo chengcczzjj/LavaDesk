@@ -1,7 +1,8 @@
-# 灵月桌面 项目进展
+# LavaDesk 项目进展
 
-> 源码与容器验证：2026-09-25；最近本机安装验证：2026-09-05（1.1.12）。
-> 1.1.13 已于 09-26 由 GitHub Actions（windows-latest）构建并发布到 GitHub Release，远端资产与更新源已复核；源码已收拢到 main。尚未在 Windows 实机安装验收。
+> 源码与容器验证：2026-10-07；最近本机安装验证：2026-09-05（1.1.12）。
+> 1.2.0 起应用改名 LavaDesk（原灵月桌面 / LingyueDesk）：新安装标识、可执行文件与数据目录，首次启动自动迁移旧数据；便签拆分为独立软件 [LavaNotes](https://github.com/chengcczzjj/LavaNotes)。1.2.0 尚未发布，GitHub 仓库需由所有者改名为 LavaDesk 后再发布。
+> 1.1.13 已于 09-26 由 GitHub Actions（windows-latest）构建并发布到 GitHub Release，远端资产与更新源已复核；尚未在 Windows 实机安装验收。
 > 状态依据现有源码与开发记录，不使用无验收口径的完成百分比；“已实现”不等于所有设备场景均已实测。
 
 ## 当前方向与阅读入口
@@ -35,13 +36,13 @@ AI 伴侣优先：有形象、有温度、陪伴式对话、桌宠和轻量桌�
 | IPC/preload | 共享通道、角色化 bridge、sandbox 窗口 | 新增能力仍须同步校验与契约测试 |
 | 自动更新 | 启动/每 6 小时/唤醒后检查，失败按 2–60 分钟退避重试；发现新版本后台自动下载，完成后系统通知与托盘“重启并更新”，安装由用户确认 | 配置/安全/重试契约已测试；真实网络中断与睡眠唤醒需实机观察 |
 | 开机启动 | 安装版注册启动项，设置可关闭 | 锁屏/开机恢复依赖 Windows 实机验证 |
-| 发行 | [1.1.13](../../doc/发布说明/1.1.13.md) 已远端发布并复核；自 1.1.13 起由 [Windows 发布流程](../../.github/workflows/release-windows.yml) 在 CI 构建、核验清单/哈希/asar 后先草稿再发布，同版本已发布即拒绝覆盖 | 推送 tag 触发；手动运行需工作流已在 main（发布时在构建提交上建 tag）；未配置 Windows 代码签名证书 |
+| 发行 | [1.2.0](../../doc/发布说明/1.2.0.md) 改名版待发布（安装包改为 `LavaDesk-Setup-<版本>.exe`，更新源改为 `chengcczzjj/LavaDesk`）；[1.1.13](../../doc/发布说明/1.1.13.md) 已远端发布并复核；自 1.1.13 起由 [Windows 发布流程](../../.github/workflows/release-windows.yml) 在 CI 构建、核验清单/哈希/asar 后先草稿再发布，同版本已发布即拒绝覆盖 | 推送 tag 触发；手动运行需工作流已在 main（发布时在构建提交上建 tag）；未配置 Windows 代码签名证书 |
 
 ## 桌面组件与管理界面
 
 | 模块 | 当前能力 | 未完成/验证边界 |
 | --- | --- | --- |
-| 通用组件系统 | 增删改、编辑拖拽/安全长按、网格、边界、避让、显式 stackOrder | 便利贴不套普通组件单实例/碰撞规则 |
+| 通用组件系统 | 增删改、编辑拖拽/安全长按、网格、边界、避让、显式 stackOrder | 已退役类型（`todo-board`）仍能读取，加载时备份并过滤，见 [widget-data.ts](../../src/shared/widget-data.ts) |
 | 配置持久化 | 实际主屏壁纸/无壁纸独立命名空间；只读不回写、旧数据读取与新增限额分离、原子保存，切换/退出前排空待写快照；损坏/写失败保留现场并阻止替换 | 跨屏拖动与异常断电仍需实机复核；退出保存失败需处理磁盘/权限后重试 |
 | 组件可见性 | 工作区缩小时临时钳制显示位置，保存坐标不变；断开显示器的绑定仍保留 | 极小屏幕上大尺寸组件不自动缩放 |
 | 组件管理 | 分类列表、浮动工具栏、主题、模态设置、新闻/股票预览 | AI 生成组件的可视化编辑、复制/撤销待完善 |
@@ -52,7 +53,7 @@ AI 伴侣优先：有形象、有温度、陪伴式对话、桌宠和轻量桌�
 | Audio | 可视化展示和频率映射已实现 | 缺少实时音频输入 |
 | QuickTools / SysMonitor | 快捷工具按钮占位；系统监控模拟展示 | 缺少真实按钮功能/真实采集接入 |
 | 图标收纳 / Dock | 四种形态与全局保存；导入/删除按组件串行，移动前先持久化恢复记录，部分恢复失败保留组件及剩余记录 | 隔离目录已验证真实文件移动；单项移回桌面/拖出恢复体验与真实 Shell 场景仍待细化 |
-| 自由便利贴 | 一任务一纸、多实例/重叠、直接拖缩、点击置顶、富文本/图片/纸色、完成撕除后保留历史 | 全屏/锁屏/远控恢复需场景实测；完整管理在软件内工作台 |
+| 便签（LavaNotes） | 内置便利贴已移除；“小组件 > 便签”页检测 `lavanotes://` 协议，已安装则新建/显示/打开管理，未安装则提示下载；旧便利贴按命名空间备份到 userData 的 `legacy-sticky-notes/` | LavaNotes 的透明窗口、钉在桌面等能力在其独立仓库验证；协议检测需 Windows 实机确认 |
 | AI 生成组件 | 声明式协议、真实股票参数、落位、入场、交互、持久化和移除；对话内修改内容/配色，按内容估算高度，强调色保证可读 | 可视化编辑/撤销体验待完善 |
 | 像素宠物 | 配置分页、默认角色、动作预览、模型生成入口、桌面同步 | 细腻情绪联动、Q 版宠物和行为增强待完成；Pet 小组件占位不作独立产品主线 |
 | 壁纸库/在线库 UI | 本地库、在线下载/更新/删除，所有者发布管理入口 | 所有者 UI 不等同授权，后端身份与仓库权限独立检查 |
@@ -67,7 +68,7 @@ AI 伴侣优先：有形象、有温度、陪伴式对话、桌宠和轻量桌�
 | 人设与过程 UI | Persona、默认伴侣基调、工具前短句、textOffset 交错时间线、耗时和失败反馈 | 回复仍偏任务型；口吻、情绪识别、等待状态和自然收束需增强 |
 | 长期记忆 | SQLite 迁移、关键词/语义混合检索、上下文预算、结构化归档和敏感度边界已接入 | 尚无完整记忆场景 E2E；设计中的管理/检索目标不自动算已实现 |
 | 轻量电脑控制 | 剪贴板、打开链接、搜索、受控文件读写等工具 | 继续围绕打开/搜索/整理小范围/简单生成收敛，避免默认进入复杂工作流 |
-| 桌面组件控制 | 声明式生成；设置按 [组件设置规格](../../src/shared/widget-config-spec.ts) 校验并返回可选值；预设/锚点添加、`arrange_widget` 移动缩放隐藏置顶（组件所在显示器本地工作区）；删除常驻组件需确认；AI 跨便笺增删改、撕下/恢复和周总结 | 新增组件设置时须同步规格与测试；撤销仍依赖桌面场景快照 |
+| 桌面组件控制 | 声明式生成；设置按 [组件设置规格](../../src/shared/widget-config-spec.ts) 校验并返回可选值；预设/锚点添加、`arrange_widget` 移动缩放隐藏置顶（组件所在显示器本地工作区）；删除常驻组件需确认；便签与待办经 `open_lavanotes` 交给 LavaNotes（未安装时返回下载地址） | 新增组件设置时须同步规格与测试；撤销仍依赖桌面场景快照 |
 | 高级工作区 Agent | Planner、审批作用域、checkpoint、artifact、自动化终态、验证结构已有实现 | 作为高级辅助保留；不要把审批等待/失败标为完成 |
 | 自检/自修复 | 明确应用本体只读、运行时数据可修的设计边界 | 诊断 UI 与受控修复流程待补，不宣称已具备完整自修复 |
 
@@ -86,7 +87,8 @@ AI 伴侣优先：有形象、有温度、陪伴式对话、桌宠和轻量桌�
 - [ ] 增强伴侣回复、情绪反馈、等待状态、Q 版桌宠与行为联动。
 - [ ] AI 组件可视化编辑、复制、一键撤销；图标单项移回/拖出恢复体验。
 - [ ] 运行时自检/自修复诊断 UI，轻量电脑控制与轻提醒/轻跟进式自动化。
-- [ ] 1.1.13 Windows 实机安装验收：开应用/切输入法时组件不闪烁、指针不跳变，便利贴一次即可输入/拖动；已装 1.1.12 能自动下载并重启更新到 1.1.13。配置 Windows 代码签名。
+- [ ] 1.2.0 Windows 实机安装验收：安装 LavaDesk 后自动关闭旧版并迁移 `%APPDATA%\lingyue-desk`（壁纸、组件、图标收纳快捷方式、聊天记忆、设置），旧版开机启动被取消、可卸载旧版；“便签”页能检测并唤起 LavaNotes。配置 Windows 代码签名。
+- [ ] GitHub 仓库 FlowWallDesk 改名为 LavaDesk（所有者在仓库设置中操作），之后发布 1.2.0。
 - [ ] 桌面图标导入测试依赖 Windows 路径分隔符，在 Linux 上失败；如需跨平台 CI 应改为平台无关断言。
 
 ## 常用源码入口
@@ -97,7 +99,8 @@ AI 伴侣优先：有形象、有温度、陪伴式对话、桌宠和轻量桌�
 | 组件尺寸/保存/置顶 | [widgetIpc.ts](../../src/main/ipc/widgetIpc.ts) 的 WIDGET_SIZE_MAP 与配置处理 |
 | 组件渲染/主题 | [widgets/index.tsx](../../src/renderer/widgets/index.tsx)、[shared/constants.tsx](../../src/renderer/widgets/shared/constants.tsx) |
 | 运行时可变路径 | [userDataPaths.ts](../../src/main/runtime/userDataPaths.ts) |
-| 图标/便笺 | [DesktopIcons.tsx](../../src/renderer/widgets/DesktopIcons/DesktopIcons.tsx)、[TodoBoard.tsx](../../src/renderer/widgets/TodoBoard/TodoBoard.tsx) |
+| 图标收纳 / 便签入口 | [DesktopIcons.tsx](../../src/renderer/widgets/DesktopIcons/DesktopIcons.tsx)、[LavaNotesPanel.tsx](../../src/renderer/main-ui/pages/widgets/LavaNotesPanel.tsx)、[lavanotes-service.ts](../../src/main/services/lavanotes-service.ts) |
+| 旧版数据迁移 | [legacyUserDataCore.ts](../../src/main/runtime/legacyUserDataCore.ts)、[legacyDataMigration.ts](../../src/main/runtime/legacyDataMigration.ts) |
 | 像素桌宠 | [PixelPetPage.tsx](../../src/renderer/main-ui/pages/pet/PixelPetPage.tsx)、[pixel-pet.ts](../../src/renderer/shared/pixel-pet.ts)、[PixelPetCanvas.tsx](../../src/renderer/shared/PixelPetCanvas.tsx) |
 | 聊天 UI/IPC | [ChatPage.tsx](../../src/renderer/main-ui/pages/chat/ChatPage.tsx)、[chatIpc.ts](../../src/main/ipc/chatIpc.ts) |
 

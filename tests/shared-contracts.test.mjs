@@ -191,9 +191,9 @@ test('native canvas hit testing follows visual z-order and keeps widgets alive w
     id: 'dock-1', type: 'desktop-icons-dock', x: 800, y: 900, width: 600, height: 88, enabled: true, config: {},
   }
   const lowerNote = {
-    id: 'note-lower', type: 'todo-board', x: 100, y: 100, width: 220, height: 190, enabled: true, config: {},
+    id: 'card-lower', type: 'generated-widget', x: 100, y: 100, width: 220, height: 190, enabled: true, config: {},
   }
-  const upperNote = { ...lowerNote, id: 'note-upper', x: 130, y: 120 }
+  const upperNote = { ...lowerNote, id: 'card-upper', x: 130, y: 120 }
   const display = { x: 0, y: 0, width: 1920, height: 1080 }
   assert.equal(findInteractiveWidgetAtPoint({ x: 810, y: 890 }, display, [dock])?.id, dock.id)
   assert.equal(findInteractiveWidgetAtPoint({ x: 400, y: 400 }, display, [dock]), undefined)
@@ -225,7 +225,7 @@ test('native canvas hit testing follows visual z-order and keeps widgets alive w
   assert.equal(isPassiveWidgetType('weather'), true)
   assert.equal(isPassiveWidgetType('quicktools'), true)
   assert.equal(isCanvasInteractiveWidgetType('clock'), false)
-  assert.equal(isCanvasInteractiveWidgetType('todo-board'), true)
+  assert.equal(isCanvasInteractiveWidgetType('generated-widget'), true)
   assert.equal(findInteractiveWidgetAtPoint({ x: 180, y: 150 }, display, [{
     id: 'clock-1', type: 'clock', x: 100, y: 100, width: 220, height: 190, enabled: true, config: {},
   }]), undefined)
