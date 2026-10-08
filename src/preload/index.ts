@@ -1,6 +1,7 @@
 import { exposeMainUiApi } from './main-ui'
 import { exposeCanvasApi } from './canvas'
 import { exposeWallpaperApi } from './wallpaper'
+import { exposeQuickChatApi } from './quick-chat'
 
 const roleArgument = process.argv.find((argument) => argument.startsWith('--lingyue-window-role='))
 const role = roleArgument?.slice('--lingyue-window-role='.length)
@@ -11,6 +12,8 @@ if (role === 'main') {
   exposeCanvasApi()
 } else if (role === 'wallpaper') {
   exposeWallpaperApi()
+} else if (role === 'quick-chat') {
+  exposeQuickChatApi()
 } else {
   throw new Error('缺少有效的 LavaDesk 窗口角色，preload 已拒绝暴露 IPC bridge。')
 }

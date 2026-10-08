@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, forwardRef, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, forwardRef, type ReactNode } from 'react'
 import {
   Sparkles,
   ArrowUp,
@@ -40,6 +40,14 @@ import {
 } from 'lucide-react'
 import type { AgentApproval, AgentApprovalDecision, AgentArtifact, AgentAutomation, AgentAutomationResult, AgentFileChange, AgentRun, ChatConversation, ChatMemory, ChatProject, WorkspacePermissionProfile } from '@shared/types'
 import { TOOL_MANIFEST, getToolManifest } from '@shared/tool-manifest'
+import { isDeclinedToolOutput, isFailedToolOutput, readActionReceipt, type ActionReceipt } from '@shared/tool-result'
+import type { ActionConfirmDecision, ActionConfirmRequest, ActionReceiptStatus } from '@shared/agent-actions'
+import type { ChatAttachment } from '@shared/chat-attachments'
+import { MarkdownText } from '@renderer/shared/chat/MarkdownText'
+import { ActionConfirmCard } from '@renderer/shared/chat/ActionConfirmCard'
+import { ActionReceipts } from '@renderer/shared/chat/ActionReceipts'
+import { useAttachmentDrop } from '@renderer/shared/chat/attachmentDrop'
+import { AttachmentChips } from '@renderer/shared/chat/AttachmentChips'
 import { PixelPetCanvas } from '@renderer/shared/PixelPetCanvas'
 import {
   PIXEL_PET_CHANGE_EVENT,
@@ -83,7 +91,28 @@ interface DisplayMessage {
   toolCalls?: ToolCallDisplay[]
   fileChanges?: AgentFileChange[]
   artifacts?: AgentArtifact[]
+  attachments?: ChatAttachment[]
   processOpen?: boolean
+}
+
+/** Actions child components of a message can trigger on the chat page. */
+interface ChatPageActions {
+  sendQuickReply: (text: string) => void
+  prefillInput: (text: string) => void
+  clearScenePreview: () => void
+  undoAction: (journalId: string) => Promise<{ ok: boolean; error?: string }>
+  loadActionStatus: (journalIds: string[]) => Promise<Record<string, ActionReceiptStatus>>
+}
+
+const ChatPageActionsCtx = createContext<ChatPageActions | null>(null)
+
+function collectReceipts(toolCalls?: ToolCallDisplay[]): ActionReceipt[] {
+  return (toolCalls ?? []).map((call) => readActionReceipt(call.output)).filter((receipt): receipt is ActionReceipt => Boolean(receipt))
+}
+
+function readAttachments(value: unknown): ChatAttachment[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is ChatAttachment => Boolean(item && typeof item === 'object' && typeof (item as ChatAttachment).id === 'string' && typeof (item as ChatAttachment).name === 'string'))
 }
 
 interface ToolCallDisplay {
@@ -447,9 +476,7 @@ function toolOutputNeedsApproval(output: unknown): boolean {
 }
 
 function isFailedToolResult(output: unknown, error?: string): boolean {
-  if (error) return true
-  const record = asRecord(output)
-  return booleanValue(record, 'ok') === false && !toolOutputNeedsApproval(output)
+  return isFailedToolOutput(output, error)
 }
 
 function buildDisplayMessagesFromEvents(events: ChatHistoryEvent[]): DisplayMessage[] {
@@ -458,12 +485,14 @@ function buildDisplayMessagesFromEvents(events: ChatHistoryEvent[]): DisplayMess
 
   for (const event of events) {
     if (event.eventType === 'user_message') {
+      const attachments = readAttachments(event.content.attachments)
       result.push({
         id: event.id,
         role: 'user',
         text: typeof event.content.text === 'string' ? event.content.text : '',
         status: 'done',
         timestamp: event.createdAt,
+        ...(attachments.length > 0 ? { attachments } : {}),
       })
       continue
     }
@@ -925,12 +954,21 @@ function saveExpandedProjectIds(expandedProjectIds: Set<string>): void {
 }
 
 // ─── Main Component ───────────────────────────────────────
+let initialConversationConsumed = false
+
+/** A conversation handed over from the desktop quick chat ("在主界面继续") opens once. */
+function consumeInitialConversationId(): string | null {
+  if (initialConversationConsumed) return null
+  initialConversationConsumed = true
+  return new URLSearchParams(window.location.search).get('conversation')
+}
+
 export function ChatPage() {
   const [subView, setSubView] = useState<SubView>('chat')
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [projects, setProjects] = useState<ChatProject[]>([])
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([])
-  const [activeConvId, setActiveConvId] = useState<string | null>(null)
+  const [activeConvId, setActiveConvId] = useState<string | null>(() => consumeInitialConversationId())
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [chatStatus, setChatStatus] = useState<ChatStatus>('idle')
@@ -958,6 +996,8 @@ export function ChatPage() {
   const [petSnapshot, setPetSnapshot] = useState<ChatPetSnapshot>(() => loadChatPetSnapshot())
   const [sustainedPetState, setSustainedPetState] = useState<PixelPetStateKey>(() => getDailyPetState())
   const [transientPetState, setTransientPetState] = useState<PixelPetStateKey | null>(null)
+  const [pendingConfirms, setPendingConfirms] = useState<ActionConfirmRequest[]>([])
+  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -1108,6 +1148,14 @@ export function ChatPage() {
     window.lingyue.chat.listAgentRuns(activeConvId).then(setAgentRuns)
   }, [activeConvId])
 
+  useEffect(() => window.lingyue.app.onNavigate((target) => {
+    if (target.activity !== 'memory' || !target.conversationId) return
+    if (chatStatusRef.current !== 'idle') return
+    setSubView('chat')
+    setActiveConvId(target.conversationId)
+    void loadConversations()
+  }), [loadConversations])
+
   // ── Keep refs in sync with state ──
   useEffect(() => { chatStatusRef.current = chatStatus }, [chatStatus])
   useEffect(() => { activeConvIdRef.current = activeConvId }, [activeConvId])
@@ -1134,6 +1182,7 @@ export function ChatPage() {
     })
     const offEnd = window.lingyue.chat.onStreamEnd(({ streamId, full, conversationId }) => {
       if (streamId === streamIdRef.current) {
+        setPendingConfirms([])
         if (streamRenderFrameRef.current != null) cancelAnimationFrame(streamRenderFrameRef.current)
         streamRenderFrameRef.current = null
         setChatStatus('idle')
@@ -1190,6 +1239,7 @@ export function ChatPage() {
     })
     const offError = window.lingyue.chat.onStreamError(({ streamId, error: err }) => {
       if (streamId === streamIdRef.current) {
+        setPendingConfirms([])
         if (streamRenderFrameRef.current != null) cancelAnimationFrame(streamRenderFrameRef.current)
         streamRenderFrameRef.current = null
         setChatStatus('idle')
@@ -1232,6 +1282,11 @@ export function ChatPage() {
         )
       }
     })
+    const offConfirm = window.lingyue.chat.onActionConfirmRequest((request) => {
+      if (request.streamId !== streamIdRef.current) return
+      setPendingConfirms((prev) => [...prev.filter((item) => item.confirmId !== request.confirmId), request])
+      showTransientPetState('confused', 2600)
+    })
     const offRunEvent = window.lingyue.chat.onAgentRunEvent(({ streamId, run }) => {
       if (streamId !== streamIdRef.current || !run) return
       setAgentRuns((prev) => {
@@ -1243,7 +1298,7 @@ export function ChatPage() {
     })
     return () => {
       if (streamRenderFrameRef.current != null) cancelAnimationFrame(streamRenderFrameRef.current)
-      offChunk(); offEnd(); offError(); offToolCall(); offRunEvent()
+      offChunk(); offEnd(); offError(); offToolCall(); offRunEvent(); offConfirm()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateActiveToolCalls])
@@ -1257,7 +1312,7 @@ export function ChatPage() {
   }, [messages, streamingText, activeToolCalls])
 
   // ── Send ──
-  const startChatStream = useCallback((payload: { conversationId?: string; projectId?: string | null; text: string; internal?: boolean; forceAgentRun?: boolean }, options?: { visibleUserText?: string | false }) => {
+  const startChatStream = useCallback((payload: { conversationId?: string; projectId?: string | null; text: string; internal?: boolean; forceAgentRun?: boolean; attachments?: ChatAttachment[] }, options?: { visibleUserText?: string | false }) => {
     const text = payload.text.trim()
     if (!text || chatStatusRef.current !== 'idle') return false
     setError(null)
@@ -1269,7 +1324,14 @@ export function ChatPage() {
       const visibleText = options?.visibleUserText ?? text
       setMessages((prev) => [
         ...prev,
-        { id: `u-${Date.now()}`, role: 'user', text: visibleText, status: 'sending', timestamp: Date.now() },
+        {
+          id: `u-${Date.now()}`,
+          role: 'user',
+          text: visibleText,
+          status: 'sending',
+          timestamp: Date.now(),
+          ...(payload.attachments?.length ? { attachments: payload.attachments } : {}),
+        },
       ])
     }
 
@@ -1282,14 +1344,20 @@ export function ChatPage() {
       setChatStatus((s) => s === 'connecting' ? 'thinking' : s)
     }, 500)
 
-    const streamId = window.lingyue.chat.sendMessage({ ...payload, text })
+    const { attachments, ...rest } = payload
+    const streamId = window.lingyue.chat.sendMessage({
+      ...rest,
+      text,
+      ...(attachments?.length ? { attachmentIds: attachments.map((item) => item.id) } : {}),
+    })
     streamIdRef.current = streamId
     showTransientPetState(inferPetStateFromText(text), 3200)
     return true
   }, [showTransientPetState, startTimer, updateActiveToolCalls])
 
   const handleSend = useCallback(async () => {
-    const text = input.trim()
+    const attachments = pendingAttachments
+    const text = input.trim() || (attachments.length > 0 ? '帮我看看这些附件' : '')
     const projectId = selectedProjectIdRef.current
     const pendingPermissionUpdate = projectId ? pendingPermissionUpdatesRef.current.get(projectId) : undefined
     if (pendingPermissionUpdate) {
@@ -1304,9 +1372,34 @@ export function ChatPage() {
       conversationId: activeConvId ?? undefined,
       projectId,
       text,
+      attachments,
     })
-    if (started) setInput('')
-  }, [input, activeConvId, startChatStream])
+    if (started) {
+      setInput('')
+      setPendingAttachments([])
+    }
+  }, [input, activeConvId, pendingAttachments, startChatStream])
+
+  const handleResolveConfirm = useCallback(async (request: ActionConfirmRequest, decision: ActionConfirmDecision) => {
+    setPendingConfirms((prev) => prev.filter((item) => item.confirmId !== request.confirmId))
+    const delivered = await window.lingyue.chat.resolveActionConfirm(request.confirmId, decision)
+    if (!delivered) setError('这张确认卡已经过期了。')
+  }, [])
+
+  const chatActions = useMemo<ChatPageActions>(() => ({
+    sendQuickReply: (text: string) => {
+      startChatStream({ conversationId: activeConvIdRef.current ?? undefined, projectId: selectedProjectIdRef.current, text })
+    },
+    prefillInput: (text: string) => {
+      setInput(text)
+      requestAnimationFrame(() => textareaRef.current?.focus())
+    },
+    clearScenePreview: () => {
+      void window.lingyue.chat.clearDesktopScenePreview()
+    },
+    undoAction: (journalId: string) => window.lingyue.chat.undoAction(journalId),
+    loadActionStatus: (journalIds: string[]) => window.lingyue.chat.getActionStatus(journalIds),
+  }), [startChatStream])
 
   const handleStop = useCallback(async () => {
     const streamId = streamIdRef.current
@@ -1398,18 +1491,29 @@ export function ChatPage() {
     textareaRef.current?.focus()
   }, [])
 
-  const handleAttachFiles = useCallback(() => {
-    const fileInput = document.createElement('input')
-    fileInput.type = 'file'
-    fileInput.multiple = true
-    fileInput.onchange = () => {
-      const files = Array.from(fileInput.files ?? [])
-      if (files.length === 0) return
-      // Electron 32+ removed File.path; resolve the local path through webUtils.
-      const names = files.map((file) => window.lingyue.utils.getFilePath(file) || file.name).join(', ')
-      setInput((prev) => `${prev}${prev ? ' ' : ''}[附件: ${names}]`)
+  const handleAttachFiles = useCallback(async () => {
+    const result = await window.lingyue.chat.attachFiles(activeConvIdRef.current)
+    if (result.attachments.length > 0) {
+      setPendingAttachments((prev) => [...prev, ...result.attachments.filter((item) => !prev.some((existing) => existing.id === item.id))].slice(0, 8))
     }
-    fileInput.click()
+    if (result.rejected.length > 0) {
+      setError(result.rejected.map((item) => `${item.name}：${item.reason}`).join('；'))
+    }
+    textareaRef.current?.focus()
+  }, [])
+
+  const handleDroppedAttachments = useCallback((added: ChatAttachment[]) => {
+    setPendingAttachments((prev) => [...prev, ...added].slice(0, 8))
+    textareaRef.current?.focus()
+  }, [])
+  const attachmentDrop = useAttachmentDrop({
+    attachData: (files) => window.lingyue.chat.attachData(files, activeConvIdRef.current),
+    onAttached: handleDroppedAttachments,
+    onRejected: setError,
+  })
+
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setPendingAttachments((prev) => prev.filter((item) => item.id !== id))
   }, [])
 
   // ── Project / Conversation management ──
@@ -1663,6 +1767,7 @@ export function ChatPage() {
   }, [chatMemories])
 
   return (
+    <ChatPageActionsCtx.Provider value={chatActions}>
     <div className="chat-layout">
       {/* ── Sidebar ── */}
       <aside className="chat-sidebar">
@@ -1966,7 +2071,17 @@ export function ChatPage() {
       {subView === 'persona' ? (
         <PersonaPage />
       ) : (
-        <main className="chat-main">
+        <main
+          className={`chat-main ${attachmentDrop.dragging ? 'chat-main--dragging' : ''}`}
+          {...attachmentDrop.dropProps}
+          onPaste={attachmentDrop.onPaste}
+        >
+          {attachmentDrop.dragging && (
+            <div className="chat-drop-overlay" aria-hidden="true">
+              <Paperclip size={24} />
+              <span>松开即可添加到对话（图片、PDF、文档、表格）</span>
+            </div>
+          )}
           <header className="chat-pet-statusbar">
             <div className="chat-pet-statusbar__left">
               <span className="chat-pet-statusbar__signal"><Sparkles size={14} /></span>
@@ -2019,6 +2134,8 @@ export function ChatPage() {
                   project={selectedProject}
                   onPermissionChange={handleUpdateProjectPermission}
                   onAttachFiles={handleAttachFiles}
+                  attachments={pendingAttachments}
+                  onRemoveAttachment={handleRemoveAttachment}
                   canCreateAutomation={Boolean(input.trim())}
                   onCreateAutomation={handleCreateAutomation}
                   ref={textareaRef}
@@ -2065,6 +2182,9 @@ export function ChatPage() {
                         })
                         return <AssistantContentTimeline items={items} live />
                       })()}
+                      {collectReceipts(activeToolCalls).length > 0 && (
+                        <ActionReceipts receipts={collectReceipts(activeToolCalls)} onUndo={chatActions.undoAction} />
+                      )}
                       {/* Elapsed time inside the streaming bubble */}
                       {elapsedTime > 0 && (
                         <span className="chat-msg__elapsed">{elapsedTime}s</span>
@@ -2085,6 +2205,11 @@ export function ChatPage() {
                     }}
                   />
                 )}
+                {pendingConfirms.map((request) => (
+                  <div key={request.confirmId} className="chat-action-confirm">
+                    <ActionConfirmCard request={request} onResolve={handleResolveConfirm} />
+                  </div>
+                ))}
                 {pendingApproval && (
                   <ApprovalDialog
                     approval={pendingApproval.approval}
@@ -2117,6 +2242,8 @@ export function ChatPage() {
                   project={selectedProject}
                   onPermissionChange={handleUpdateProjectPermission}
                   onAttachFiles={handleAttachFiles}
+                  attachments={pendingAttachments}
+                  onRemoveAttachment={handleRemoveAttachment}
                   canCreateAutomation={Boolean(input.trim())}
                   onCreateAutomation={handleCreateAutomation}
                   ref={textareaRef}
@@ -2172,6 +2299,7 @@ export function ChatPage() {
         </main>
       )}
     </div>
+    </ChatPageActionsCtx.Provider>
   )
 }
 
@@ -2355,6 +2483,7 @@ function desktopSceneLayerLabel(layer: string | null): string {
 }
 
 function DesktopSceneDraftCard({ output }: { output: unknown }) {
+  const actions = useContext(ChatPageActionsCtx)
   const root = asRecord(output)
   const plan = asRecord(root?.plan)
   if (!plan) return null
@@ -2420,10 +2549,10 @@ function DesktopSceneDraftCard({ output }: { output: unknown }) {
       )}
       {guidance && <div className="desktop-scene-card__guidance">{guidance}</div>}
       <div className="desktop-scene-card__actions" aria-label="桌面草案操作">
-        <button type="button" disabled>应用草案</button>
-        <button type="button" disabled>再改一版</button>
-        <button type="button" disabled>取消预览</button>
-        <span>对我说“应用这个草案”即可写入</span>
+        <button type="button" disabled={!actions} onClick={() => actions?.sendQuickReply(`就按这个「${sceneName}」草案应用吧`)}>应用草案</button>
+        <button type="button" disabled={!actions} onClick={() => actions?.prefillInput(`「${sceneName}」再改一版：`)}>再改一版</button>
+        <button type="button" disabled={!actions} onClick={() => actions?.clearScenePreview()}>取消预览</button>
+        <span>应用后随时可以撤回</span>
       </div>
     </div>
   )
@@ -2471,8 +2600,9 @@ function DesktopSceneResultCard({ toolName, output }: { toolName: string; output
 function ToolProcessItem({ tc, count = 1 }: { tc: ToolCallDisplay; count?: number }) {
   const info = toolActivityInfo(tc)
   const needsApproval = toolOutputNeedsApproval(tc.output)
-  const failed = tc.status === 'error' || (info.ok === false && !needsApproval)
-  let stateText = tc.status === 'running' ? '处理中' : needsApproval ? '需要确认' : failed ? '没成功' : count > 1 ? `已处理 ${count} 次` : '已处理'
+  const declined = isDeclinedToolOutput(tc.output)
+  const failed = !declined && (tc.status === 'error' || (info.ok === false && !needsApproval))
+  let stateText = tc.status === 'running' ? '处理中' : needsApproval ? '需要确认' : declined ? '已取消' : failed ? '没成功' : count > 1 ? `已处理 ${count} 次` : '已处理'
   if (tc.toolName === 'web_search') {
     stateText = tc.status === 'running' ? '搜索中' : needsApproval ? '需要确认' : failed ? '没成功' : count > 1 ? `已搜索 ${count} 次` : '已搜索'
   }
@@ -2536,8 +2666,8 @@ function AssistantContentTimeline({
       {items.map((item, index) => {
         if (item.type === 'bubble') {
           return (
-            <div key={item.id} className="chat-msg__bubble">
-              {item.text}
+            <div key={item.id} className="chat-msg__bubble chat-msg__bubble--rich">
+              <MarkdownText text={item.text} />
               {live && index === lastBubbleIndex && <span className="chat-cursor" />}
               {showErrorBadge && index === lastBubbleIndex && (
                 <span className="chat-msg__error-badge">
@@ -2569,7 +2699,9 @@ function MessageBubble({
   onShowArtifact: (id: string) => void
 }) {
   const isUser = message.role === 'user'
+  const actions = useContext(ChatPageActionsCtx)
   const assistantItems = isUser ? [] : buildAssistantContentTimeline({ text: message.text, toolCalls: message.toolCalls })
+  const receipts = isUser ? [] : collectReceipts(message.toolCalls)
   return (
     <div className={`chat-msg chat-msg--${message.role}`}>
       <div className={`chat-msg__avatar ${isUser ? 'chat-msg__avatar--user' : 'chat-msg__avatar--ai'}`}>
@@ -2577,6 +2709,12 @@ function MessageBubble({
       </div>
       <div className="chat-msg__content">
         {!isUser && <AssistantContentTimeline items={assistantItems} showErrorBadge={message.status === 'error'} />}
+        {isUser && message.attachments && message.attachments.length > 0 && (
+          <AttachmentChips attachments={message.attachments} />
+        )}
+        {!isUser && receipts.length > 0 && actions && (
+          <ActionReceipts receipts={receipts} onUndo={actions.undoAction} onLoadStatus={actions.loadActionStatus} />
+        )}
         {isUser && message.text && (
           <div className="chat-msg__bubble">
             {message.text}
@@ -2810,7 +2948,7 @@ function ApprovalDialog({ approval, project, onResolve }: { approval: AgentAppro
         <AlertCircle size={16} />
         <div>
           <div className="approval-dialog__title">需要授权</div>
-          <div className="approval-dialog__meta">{project?.displayName ?? project?.name ?? '当前工作区'} · {approval.riskLevel === 'high' ? '高风险' : '中风险'}</div>
+          <div className="approval-dialog__meta">{project?.displayName ?? project?.name ?? '当前工作区'} · {approval.riskLevel === 'critical' ? '极高风险' : approval.riskLevel === 'high' ? '高风险' : approval.riskLevel === 'low' ? '低风险' : '中风险'}</div>
         </div>
       </div>
       <div className="approval-dialog__body">
@@ -2919,10 +3057,12 @@ interface InputBoxProps {
   isRunning: boolean
   modelName: string
   connected: boolean | null
+  attachments?: ChatAttachment[]
+  onRemoveAttachment?: (id: string) => void
 }
 
 const InputBox = forwardRef<HTMLTextAreaElement, InputBoxProps>(
-  ({ value, onChange, onKeyDown, onSend, onStop, onAttachFiles, canCreateAutomation, onCreateAutomation, project, onPermissionChange, disabled, isRunning, modelName, connected }, ref) => {
+  ({ value, onChange, onKeyDown, onSend, onStop, onAttachFiles, canCreateAutomation, onCreateAutomation, project, onPermissionChange, disabled, isRunning, modelName, connected, attachments = [], onRemoveAttachment }, ref) => {
     const [addMenuOpen, setAddMenuOpen] = useState(false)
 
     useEffect(() => {
@@ -2942,6 +3082,11 @@ const InputBox = forwardRef<HTMLTextAreaElement, InputBoxProps>(
 
     return (
       <div className="chat-input-wrapper">
+        {attachments.length > 0 && (
+          <div className="chat-input__attachments">
+            <AttachmentChips attachments={attachments} onRemove={onRemoveAttachment} />
+          </div>
+        )}
         <textarea
           ref={ref}
           className="chat-input__textarea"
@@ -2996,7 +3141,7 @@ const InputBox = forwardRef<HTMLTextAreaElement, InputBoxProps>(
           <button
             className="chat-input__send-btn"
             onClick={isRunning ? onStop : onSend}
-            disabled={isRunning ? false : disabled || !value.trim()}
+            disabled={isRunning ? false : disabled || (!value.trim() && attachments.length === 0)}
             title={isRunning ? '停止' : '发送 (Enter)'}
           >
             {isRunning ? <Square size={15} /> : disabled ? <Loader2 size={16} className="spin" /> : <ArrowUp size={18} />}

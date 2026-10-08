@@ -2,11 +2,13 @@ import type { IpcMainEvent, IpcMainInvokeEvent, WebContents } from 'electron'
 import { getMainWindow } from '../windows/mainWindow'
 import { getCanvasWindow } from '../windows/canvasWindow'
 import { isWallpaperWebContents } from '../windows/wallpaperWindow'
+import { getQuickChatWindow } from '../windows/quickChatWindow'
 
-export type IpcWindowRole = 'main' | 'canvas' | 'wallpaper'
+export type IpcWindowRole = 'main' | 'canvas' | 'wallpaper' | 'quick-chat'
 
 function roleWebContents(role: Exclude<IpcWindowRole, 'wallpaper'>): WebContents | null {
   if (role === 'main') return getMainWindow()?.webContents ?? null
+  if (role === 'quick-chat') return getQuickChatWindow()?.webContents ?? null
   return getCanvasWindow()?.webContents ?? null
 }
 

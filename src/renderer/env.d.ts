@@ -2,12 +2,14 @@
 import type { LingyueApi } from '../preload/main-ui'
 import type { WallpaperPreload } from '../preload/wallpaper'
 import type { CanvasPreload } from '../preload/canvas'
+import type { QuickChatApi } from '../preload/quick-chat'
 
 declare global {
   interface Window {
     lingyue: LingyueApi
     wallpaperBridge: WallpaperPreload
     canvasBridge: CanvasPreload
+    quickChat: QuickChatApi
   }
 }
 

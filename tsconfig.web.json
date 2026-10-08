@@ -3,7 +3,9 @@
   "include": [
     "src/renderer/**/*",
     "src/shared/**/*",
-    "src/renderer/env.d.ts"
+    "src/renderer/env.d.ts",
+    "src/preload/chat-stream.ts",
+    "src/preload/quick-chat.ts"
   ],
   "compilerOptions": {
     "composite": true,

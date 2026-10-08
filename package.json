@@ -23,7 +23,8 @@
     "build:win": "npm run vite:build && electron-builder --win --config.win.signExecutable=false",
     "build:win:signed": "npm run vite:build && electron-builder --win",
     "build:dir": "npm run vite:build && electron-builder --dir --config.win.signExecutable=false",
-    "test:electron:smoke": "npm run build:check && node tests/electron/run-smoke.mjs"
+    "test:electron:smoke": "npm run build:check && node tests/electron/run-smoke.mjs",
+    "eval:companion": "node --experimental-strip-types scripts/companion-eval.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.67",

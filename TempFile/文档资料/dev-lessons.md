@@ -56,7 +56,7 @@
 - 适用：组件拖动、碰撞、缩放、置顶。
 - 根因：仅用数组顺序表示层级会在异步保存中覆盖新操作。
 - 当前约束：组件采用持久化 `stackOrder`，位置/配置写入不能覆盖更晚的置顶操作；浮动组件尺寸在字体就绪后实测，不只按缩放系数推算。
-- 替代关系：2026-10-07 起内置便利贴（`todo-board`）整体移除，改由独立软件 [LavaNotes](https://github.com/chengcczzjj/LavaNotes) 以“每张便签一个透明窗口”实现。全屏透明 Canvas 为便利贴做的自由拖动、临时键盘焦点（`setCanvasTextInputActive`）和点击置顶 IPC 一并删除；旧数据处理见 L15。
+- 替代关系：2026-10-07 起内置便利贴（`todo-board`）整体移除，改由独立软件 [LavaNotes](https://github.com/chengcczzjj/LavaNotes) 以“每张便签一个透明窗口”实现。全屏透明 Canvas 为便利贴做的自由拖动、临时键盘焦点（`setCanvasTextInputActive`）和点击置顶 IPC 一并删除；旧数据处理见 L18。
 - 代码：[widget-order.ts](../../src/shared/widget-order.ts)、[widgetIpc.ts](../../src/main/ipc/widgetIpc.ts)。测试：[shared-contracts.test.mjs](../../tests/shared-contracts.test.mjs)。
 - 来源：2026-04-26 视觉尺寸、08-16 便利贴重做、08-30 显式层级、10-07 便签拆分。
 
@@ -135,7 +135,35 @@
 - 代码：[protocols.ts](../../src/main/protocols.ts)。测试：[wallpaper-security.test.mjs](../../tests/wallpaper-security.test.mjs)、[wallpaper-sandbox.cjs](../../tests/electron/wallpaper-sandbox.cjs)；后者在实际 Electron/Chromium 中验证隔离，不仅匹配 CSP 字符串。
 - 来源：2026-09-05 网页壁纸安全修复；第三方壁纸若依赖被禁能力应报告兼容性问题，不回退整目录授权或关闭沙箱。
 
-## L15 改名与退役：先保证旧数据能读，再迁移
+## L15 伴侣桌面控制：能力可见、确认和撤回都写在代码里
+
+- 适用：聊天智能体的工具暴露、桌面写操作、需要用户同意的动作、回执与撤回、系统提示结构。
+- 根因：按中文正则逐轮裁剪工具，换个说法模型就“看不到”该用的工具，只能口头答应；工具结果只回放文字，下一轮不知道刚改了什么；删除 Dock 的 `confirmed=true` 由模型自己填；旧工具返回 `success:false` 而判定只认 `ok:false`，失败被显示成“已处理”；同一轮里写操作之后仍命中缓存的只读结果；天气工具描述在提交时被编码成问号，模型读到的是乱码。
+- 当前做法：桌面类工具常驻并按清单顺序发送，重工具（文件/命令/编排草案/附件）仍按工作区、意图或附件门控；系统提示固定前缀在前，时间、记忆、【桌面现状】、【最近的桌面操作】在尾部。确认由策略在工具包装层挂起并由界面回答，模型参数不能绕过；后台运行没有确认通道即视为未同意。带 `journal` 的工具串行快照前后状态，按组件 id 差异撤回；删除图标类组件不可自动撤回。写操作清空本轮只读缓存；结果口径统一由 `tool-result.ts` 判断。
+- 边界：日志只在内存保存；撤回在壁纸被换过或组件属于另一张壁纸时拒绝，而不是覆盖用户之后的改动。`SendInput`、开始菜单索引和热键只能在 Windows 实机验收。
+- 代码：[toolRouter.ts](../../src/main/memory/tools/toolRouter.ts)、[toolExecution.ts](../../src/main/memory/chat/toolExecution.ts)、[actionPolicy.ts](../../src/main/memory/desktop/actionPolicy.ts)、[desktopState.ts](../../src/main/memory/desktop/desktopState.ts)、[agent-actions.ts](../../src/shared/agent-actions.ts)。测试：[companion-agent.test.mjs](../../tests/companion-agent.test.mjs)（含 87 句中文指令可达性评测）、[quick-chat.cjs](../../tests/electron/quick-chat.cjs)；真实模型正确率用 `npm.cmd run eval:companion` 测量。
+- 来源：2026-09-26 伴侣智能体桌面控制迭代；设计见 [伴侣智能体桌面控制设计](../../doc/伴侣智能体桌面控制设计.md)。L09 的“工具调用不回放为消息”约束不变，改为注入确定性的操作摘要。
+- 补充（2026-09-27）：粘贴/拖入的附件只以字节交给主进程另存副本（图片校验文件头），渲染层不传、也拿不到路径；按路径授权只来自原生选择器。回执状态以操作日志为准（`ActionJournal.status`），重启后显示过期而不是给出必然失败的撤回按钮。测试：[companion-ux.test.mjs](../../tests/companion-ux.test.mjs)。
+
+## L16 可点击的桌面组件不能留在“被动组件”名单
+
+- 适用：给画布组件新增点击、按钮或悬停交互（桌宠、快捷工具等），或调整 `PASSIVE_WIDGET_TYPES`。
+- 根因：被动名单决定 Windows 下光标经过组件时画布是否取消鼠标穿透。名单内的组件在实机上点击会直接落到桌面/后方窗口；Linux 容器和 Playwright 不走原生命中，点击照常生效，所以测试全绿也发现不了。
+- 当前约束：只有纯展示组件（时钟、天气、新闻、日历、系统监控等）留在名单；有点击动作的组件必须移出，并在 [shared-contracts.test.mjs](../../tests/shared-contracts.test.mjs) 断言。交互组件在非编辑态不走长按拖动（交互优先），移动用编辑模式。
+- 代码：[canvas-hit-test.ts](../../src/shared/canvas-hit-test.ts)、[Canvas.tsx](../../src/renderer/canvas/Canvas.tsx)（`data-widget-interactive`）、[canvasWindow.ts](../../src/main/windows/canvasWindow.ts)。
+- 验证：Windows 实机点击桌宠/快捷工具并确认未触发桌面；与 L04/L05 的遮挡与前台归属判断一起观察，不以提升窗口层级代替。
+- 来源：2026-08-24 快捷工具与桌宠因当时只是占位被列为被动；2026-09-26 桌宠加入“点我聊天”时遗漏，09-27 快捷工具接入真实动作时发现并修正。
+
+## L17 内嵌第三方站点与下载：隔离分区、按内容信任、等判重答案
+
+- 适用：FlowWall 等在线壁纸站点的内嵌浏览、捕获站点下载、`lingyue://` 协议请求。
+- 根因：站点页面与下载内容都不受应用控制；需登录/会员时下载链接可能返回 HTML 登录页却仍叫 `.mp4`；CDN 签名让同一文件每次 URL 不同；小文件往往在异步判重（读壁纸库）返回前就已下载完成，只在“仍在下载”时取消会漏掉重复，库里出现两份。
+- 当前约束：独立持久分区、sandbox、无 preload/Node，权限默认拒绝，`file:`/`javascript:` 导航拦截，站外链接交给系统浏览器；只接管壁纸类型下载，按文件头签名信任并按真实类型改名；判重键为去掉查询串的来源地址且壁纸仍在库中，下载完成后等待判重结果再导入；协议导入一律弹窗确认并写明域名。不绕过站点登录/付费，不抓私有接口。
+- 代码：[flowwall.ts](../../src/shared/flowwall.ts)、[media-signature.ts](../../src/shared/media-signature.ts)、[flowwall-library.ts](../../src/main/services/flowwall-library.ts)。测试：[flowwall.test.mjs](../../tests/flowwall.test.mjs)（含判重竞态回归，旧逻辑下失败）、[flowwall.cjs](../../tests/electron/flowwall.cjs)。
+- 验证：真实站点的下载形态（直链/blob/需登录）与 Windows DPI 下的视图贴合仍待实测；开发构建可用 `LINGYUE_FLOWWALL_HOME` 指向本地替身站点。
+- 来源：2026-09-27 FlowWall 在线壁纸库接入；设计见 [FlowWall 在线壁纸库接入设计](../../doc/FlowWall在线壁纸库接入设计.md)。与 L10 一致：UI 门禁不是授权，下载文件不是可信内容。
+
+## L18 改名与退役：先保证旧数据能读，再迁移
 
 - 适用：改产品名/appId/数据目录、删除组件类型、更换数据文件名。
 - 根因：Electron 的 userData 目录取自 `productName`（无则 `name`），改名即换目录；`storedWidgetSchema` 用组件类型枚举校验，直接从枚举删掉 `todo-board` 会让所有含旧便利贴的配置被判为“格式异常”而拒绝加载。electron-store、记忆库和 Chromium 一旦打开新目录就会写入默认文件，迁移必须在它们之前完成。

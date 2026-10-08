@@ -18,6 +18,13 @@ import { registerWidgetIpc, restoreWidgets } from './ipc/widgetIpc'
 import { registerDesktopIconIpc } from './ipc/desktopIconIpc'
 import { registerDataIpc } from './ipc/dataIpc'
 import { registerChatIpc } from './ipc/chatIpc'
+import { registerCompanionIpc } from './ipc/companionIpc'
+import { registerFlowWallIpc } from './ipc/flowwallIpc'
+import { showMainWindow } from './ipc/appIpc'
+import { handleLingyueDeepLink } from './services/flowwall-library'
+import { LINGYUE_PROTOCOL, parseLingyueDeepLink } from '@shared/flowwall'
+import { ReminderService } from './memory/desktop/reminderService'
+import { applyQuickChatShortcut } from './services/quick-chat-shortcut'
 import { allowAssetRoot, registerAssetProtocol, registerAssetSchemePrivileged } from './protocols'
 import { getRemoteWallpapersRoot, getUserWallpapersRoot } from './runtime/userDataPaths'
 import { initMemorySystem } from './memory'
@@ -68,7 +75,27 @@ if (!gotTheLock) {
   app.quit()
 }
 
+/**
+ * lingyue:// links from the FlowWall site (or any page) open the online library
+ * or offer a wallpaper download; the parser rejects everything else.
+ */
+function openDeepLink(argv: readonly string[]): boolean {
+  const raw = argv.find((argument) => argument.startsWith(`${LINGYUE_PROTOCOL}://`))
+  const link = raw ? parseLingyueDeepLink(raw) : null
+  if (!link) return false
+  showMainWindow({ activity: 'library', subPage: 'flowwall' })
+  const win = getMainWindow()
+  if (win) void handleLingyueDeepLink(link, win)
+  return true
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  if (app.isReady()) openDeepLink([url])
+})
+
 app.on('second-instance', (_event, argv) => {
+  if (openDeepLink(argv)) return
   const main = getMainWindow() ?? createMainWindow()
   if (argv.includes('--lingyue-wallpaper-owner')) {
     enableWallpaperOwnerMode()
@@ -125,6 +152,9 @@ app.whenReady().then(async () => {
   registerDesktopIconIpc()
   registerDataIpc()
   registerChatIpc()
+  registerCompanionIpc()
+  registerFlowWallIpc()
+  if (app.isPackaged) app.setAsDefaultProtocolClient(LINGYUE_PROTOCOL)
 
   // Older releases stored monitor-relative coordinates and could leave a
   // virtual-desktop window straddling two displays.  Normalize before any
@@ -150,6 +180,9 @@ app.whenReady().then(async () => {
   await restoreWallpaper()
   await restoreWidgets()
   void finishLegacyMigrationAfterReady()
+  ReminderService.start()
+  applyQuickChatShortcut()
+  openDeepLink(process.argv)
   if (is.dev && process.env.LINGYUE_DOCK_SELF_TEST) {
     const rounds = Math.max(1, Math.min(10, Number(process.env.LINGYUE_DOCK_SELF_TEST_ROUNDS) || 3))
     const initialDelayMs = Math.max(500, Math.min(60_000, Number(process.env.LINGYUE_DOCK_SELF_TEST_DELAY_MS) || 2_500))

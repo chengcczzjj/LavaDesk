@@ -17,6 +17,8 @@ import type {
   WallpaperFramePayload,
 } from '@shared/types'
 import type { CanvasHitRegion } from '@shared/canvas-hit-test'
+import type { WidgetCommandEnvelope } from '@shared/widget-command'
+import type { SystemStats } from '@shared/system-stats'
 
 const api = {
   onSync: (cb: (list: WidgetInstance[]) => void): (() => void) => {
@@ -43,6 +45,21 @@ const api = {
     const handler = () => cb()
     ipcRenderer.on(IPC.CANVAS_POINTER_RESET, handler)
     return () => ipcRenderer.off(IPC.CANVAS_POINTER_RESET, handler)
+  },
+  /** Pet reactions, white-noise playback and other transient widget commands from the companion. */
+  onWidgetCommand: (cb: (command: WidgetCommandEnvelope) => void): (() => void) => {
+    const handler = (_: unknown, command: WidgetCommandEnvelope) => cb(command)
+    ipcRenderer.on(IPC.WIDGET_COMMAND, handler)
+    return () => ipcRenderer.off(IPC.WIDGET_COMMAND, handler)
+  },
+  /** Clicking the desktop pet opens the quick chat. */
+  toggleQuickChat: (): void => {
+    ipcRenderer.send(IPC.QUICK_CHAT_TOGGLE)
+  },
+  /** Sticky notes live in LavaNotes; when it is missing the main window's 便签 page opens instead. */
+  newLavaNote: async (): Promise<boolean> => {
+    const result = await ipcRenderer.invoke(IPC.LAVANOTES_OPEN, 'new') as { installed: boolean; opened: boolean }
+    return result.opened || !result.installed
   },
   getWidgets: (): Promise<WidgetInstance[]> => ipcRenderer.invoke(IPC.WIDGET_LIST),
   getFilePath: (file: File): string | undefined => {
@@ -103,6 +120,9 @@ const api = {
   openExplorer: (): Promise<boolean> => ipcRenderer.invoke(IPC.APP_OPEN_EXPLORER),
   openRecycleBin: (): Promise<boolean> => ipcRenderer.invoke(IPC.APP_OPEN_RECYCLE_BIN),
   showDesktop: (): Promise<boolean> => ipcRenderer.invoke(IPC.APP_SHOW_DESKTOP),
+  /** Quick tools: open the Windows snipping overlay (or save a capture elsewhere). */
+  startScreenSnip: (): Promise<{ ok: boolean; mode: 'snip' | 'saved'; error?: string }> => ipcRenderer.invoke(IPC.APP_SCREEN_SNIP),
+  getSystemStats: (): Promise<SystemStats> => ipcRenderer.invoke(IPC.SYSTEM_STATS),
   /** 监听壁纸抽帧（用于毛玻璃效果），每台显示器独立一路 */
   onFrame: (cb: (frame: WallpaperFramePayload) => void): (() => void) => {
     const handler = (_: unknown, frame: WallpaperFramePayload) => cb(frame)

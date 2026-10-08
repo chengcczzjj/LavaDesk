@@ -17,6 +17,7 @@ import type { WallpaperApplyTarget, WallpaperDisplaySettings } from '@shared/typ
 import { LibraryPage } from './pages/LibraryPage'
 import { WallpaperDisplayControls } from './components/WallpaperDisplayControls'
 import { OnlineWallpaperPage } from './pages/OnlineWallpaperPage'
+import { FlowWallPage } from './pages/FlowWallPage'
 import { EmptyPage } from './pages/EmptyPage'
 import { WidgetsPage } from './pages/WidgetsPage'
 import { PixelPetPage } from './pages/pet/PixelPetPage'
@@ -49,6 +50,7 @@ const NAV_TABS: Record<ActivityKey, { label: string; pages?: { id: string; label
     pages: [
       { id: 'library', label: '本地壁纸' },
       { id: 'store', label: '壁纸库' },
+      { id: 'flowwall', label: 'FlowWall 发现' },
       { id: 'maker', label: '壁纸制作' },
     ],
   },
@@ -353,6 +355,15 @@ export function App() {
                 refreshKey={refreshKey}
                 wallpaperTarget={effectiveWallpaperTarget}
                 displaySettings={displaySettings}
+              />
+            )}
+            {activity === 'library' && subPage === 'flowwall' && (
+              <FlowWallPage
+                wallpaperTarget={effectiveWallpaperTarget}
+                onShowLibrary={() => {
+                  setSubPage('library')
+                  setRefreshKey((key) => key + 1)
+                }}
               />
             )}
             {activity === 'library' && subPage === 'maker' && (

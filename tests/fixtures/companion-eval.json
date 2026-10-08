@@ -1,0 +1,802 @@
+[
+ {
+  "id": "c001",
+  "utterance": "换个壁纸",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "random",
+    "list",
+    "apply"
+   ]
+  }
+ },
+ {
+  "id": "c002",
+  "utterance": "随便换一张壁纸吧",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "random"
+   ]
+  }
+ },
+ {
+  "id": "c003",
+  "utterance": "给我换一张安静点的静态壁纸",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "random",
+    "list",
+    "apply"
+   ]
+  }
+ },
+ {
+  "id": "c004",
+  "utterance": "壁纸声音太吵了，小一点",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "settings"
+   ]
+  }
+ },
+ {
+  "id": "c005",
+  "utterance": "把壁纸静音",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "settings"
+   ]
+  }
+ },
+ {
+  "id": "c006",
+  "utterance": "壁纸播放慢一点",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "settings"
+   ]
+  }
+ },
+ {
+  "id": "c007",
+  "utterance": "现在用的是哪张壁纸",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "current"
+   ]
+  }
+ },
+ {
+  "id": "c008",
+  "utterance": "我有哪些樱花相关的壁纸",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "list"
+   ]
+  }
+ },
+ {
+  "id": "c009",
+  "utterance": "两块屏幕都用同一张壁纸",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "display_mode",
+    "apply"
+   ]
+  }
+ },
+ {
+  "id": "c010",
+  "utterance": "壁纸跨两块屏铺开",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "display_mode"
+   ]
+  }
+ },
+ {
+  "id": "c011",
+  "utterance": "在线壁纸库里找个下雨的",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "online_search"
+   ]
+  }
+ },
+ {
+  "id": "c012",
+  "utterance": "帮我下载那张在线壁纸并用上",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "online_install",
+    "online_search"
+   ]
+  }
+ },
+ {
+  "id": "c013",
+  "utterance": "桌面加个天气",
+  "tool": "add_widget",
+  "args": {
+   "type": [
+    "weather"
+   ]
+  }
+ },
+ {
+  "id": "c014",
+  "utterance": "放一个时钟到右上角",
+  "tool": "add_widget",
+  "args": {
+   "type": [
+    "clock",
+    "elegantclock",
+    "pixelclock",
+    "graphicdatetime"
+   ]
+  }
+ },
+ {
+  "id": "c015",
+  "utterance": "加个日历",
+  "tool": "add_widget",
+  "args": {
+   "type": [
+    "calendar"
+   ]
+  }
+ },
+ {
+  "id": "c016",
+  "utterance": "桌面上放个新闻热搜",
+  "tool": "add_widget",
+  "args": {
+   "type": [
+    "news"
+   ]
+  }
+ },
+ {
+  "id": "c017",
+  "utterance": "帮我看着茅台 600519",
+  "tool": "add_widget",
+  "args": {
+   "type": [
+    "stocks"
+   ]
+  }
+ },
+ {
+  "id": "c018",
+  "utterance": "桌面上都有什么组件",
+  "tool": "list_widgets"
+ },
+ {
+  "id": "c019",
+  "utterance": "把天气挪到左下角",
+  "tool": "arrange_widget"
+ },
+ {
+  "id": "c020",
+  "utterance": "时钟大一点",
+  "tool": "arrange_widget"
+ },
+ {
+  "id": "c021",
+  "utterance": "先把新闻藏起来",
+  "tool": "arrange_widget"
+ },
+ {
+  "id": "c022",
+  "utterance": "把日历删掉",
+  "tool": "remove_widget"
+ },
+ {
+  "id": "c023",
+  "utterance": "时钟换成深色",
+  "tool": "update_widget_config"
+ },
+ {
+  "id": "c024",
+  "utterance": "天气组件透明一点",
+  "tool": "update_widget_config"
+ },
+ {
+  "id": "c025",
+  "utterance": "做一个距离考试还有 30 天的倒计时卡片",
+  "tool": "create_generated_widget"
+ },
+ {
+  "id": "c026",
+  "utterance": "记一下明天交周报",
+  "tool": "open_lavanotes",
+  "args": {
+   "action": [
+    "new"
+   ]
+  }
+ },
+ {
+  "id": "c027",
+  "utterance": "周报那件事做完了",
+  "tool": "open_lavanotes"
+ },
+ {
+  "id": "c028",
+  "utterance": "我这周都完成了什么",
+  "tool": "open_lavanotes",
+  "args": {
+   "action": [
+    "manager",
+    "show"
+   ]
+  }
+ },
+ {
+  "id": "c029",
+  "utterance": "在桌面上写一句今晚只做一件事",
+  "tool": "add_widget",
+  "args": {
+   "type": [
+    "text"
+   ]
+  }
+ },
+ {
+  "id": "c030",
+  "utterance": "打开微信",
+  "tool": "app_control",
+  "args": {
+   "action": [
+    "open"
+   ]
+  }
+ },
+ {
+  "id": "c031",
+  "utterance": "帮我开一下网易云",
+  "tool": "app_control",
+  "args": {
+   "action": [
+    "open"
+   ]
+  }
+ },
+ {
+  "id": "c032",
+  "utterance": "启动记事本",
+  "tool": "app_control",
+  "args": {
+   "action": [
+    "open"
+   ]
+  }
+ },
+ {
+  "id": "c033",
+  "utterance": "打开计算器算点东西",
+  "tool": "app_control",
+  "args": {
+   "action": [
+    "open"
+   ]
+  }
+ },
+ {
+  "id": "c034",
+  "utterance": "我电脑上装了 Chrome 吗",
+  "tool": "app_control",
+  "args": {
+   "action": [
+    "online_search"
+   ]
+  }
+ },
+ {
+  "id": "c035",
+  "utterance": "打开 VS Code",
+  "tool": "app_control",
+  "args": {
+   "action": [
+    "open"
+   ]
+  }
+ },
+ {
+  "id": "c036",
+  "utterance": "显示桌面",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "show_desktop"
+   ]
+  }
+ },
+ {
+  "id": "c037",
+  "utterance": "把窗口都最小化",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "show_desktop"
+   ]
+  }
+ },
+ {
+  "id": "c038",
+  "utterance": "打开蓝牙设置",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "open_settings"
+   ],
+   "page": [
+    "bluetooth"
+   ]
+  }
+ },
+ {
+  "id": "c039",
+  "utterance": "打开显示设置，我要调分辨率",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "open_settings"
+   ],
+   "page": [
+    "display"
+   ]
+  }
+ },
+ {
+  "id": "c040",
+  "utterance": "打开声音设置",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "open_settings"
+   ],
+   "page": [
+    "sound"
+   ]
+  }
+ },
+ {
+  "id": "c041",
+  "utterance": "打开 Windows 更新",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "open_settings"
+   ],
+   "page": [
+    "windows_update"
+   ]
+  }
+ },
+ {
+  "id": "c042",
+  "utterance": "打开下载文件夹",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "open_folder"
+   ],
+   "folder": [
+    "downloads"
+   ]
+  }
+ },
+ {
+  "id": "c043",
+  "utterance": "打开回收站",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "open_folder"
+   ],
+   "folder": [
+    "recycle_bin"
+   ]
+  }
+ },
+ {
+  "id": "c044",
+  "utterance": "声音调大一点",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "volume"
+   ],
+   "direction": [
+    "up"
+   ]
+  }
+ },
+ {
+  "id": "c045",
+  "utterance": "电脑静音",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "volume"
+   ],
+   "direction": [
+    "mute"
+   ]
+  }
+ },
+ {
+  "id": "c046",
+  "utterance": "音乐暂停一下",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "media"
+   ],
+   "key": [
+    "play_pause"
+   ]
+  }
+ },
+ {
+  "id": "c047",
+  "utterance": "下一首",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "media"
+   ],
+   "key": [
+    "next"
+   ]
+  }
+ },
+ {
+  "id": "c048",
+  "utterance": "截个图",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "screenshot"
+   ]
+  }
+ },
+ {
+  "id": "c049",
+  "utterance": "帮我看看屏幕上这个报错是什么意思",
+  "tool": "system_control",
+  "args": {
+   "action": [
+    "screenshot"
+   ]
+  }
+ },
+ {
+  "id": "c050",
+  "utterance": "放点雨声",
+  "tool": "ambient_sound",
+  "args": {
+   "action": [
+    "play"
+   ],
+   "sound": [
+    "rain"
+   ]
+  }
+ },
+ {
+  "id": "c051",
+  "utterance": "来点白噪音，我要专心",
+  "tool": "ambient_sound",
+  "args": {
+   "action": [
+    "play"
+   ]
+  }
+ },
+ {
+  "id": "c052",
+  "utterance": "想听咖啡馆的声音",
+  "tool": "ambient_sound",
+  "args": {
+   "action": [
+    "play"
+   ],
+   "sound": [
+    "coffee"
+   ]
+  }
+ },
+ {
+  "id": "c053",
+  "utterance": "把白噪音关了",
+  "tool": "ambient_sound",
+  "args": {
+   "action": [
+    "pause"
+   ]
+  }
+ },
+ {
+  "id": "c054",
+  "utterance": "20 分钟后提醒我喝水",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "create"
+   ]
+  }
+ },
+ {
+  "id": "c055",
+  "utterance": "明天早上 8 点提醒我开会",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "create"
+   ]
+  }
+ },
+ {
+  "id": "c056",
+  "utterance": "每天晚上 11 点提醒我睡觉",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "create"
+   ],
+   "repeat": [
+    "daily"
+   ]
+  }
+ },
+ {
+  "id": "c057",
+  "utterance": "工作日每天 9 点提醒我打卡",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "create"
+   ],
+   "repeat": [
+    "weekdays"
+   ]
+  }
+ },
+ {
+  "id": "c058",
+  "utterance": "每隔一小时提醒我起来走走",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "create"
+   ],
+   "repeat": [
+    "interval"
+   ]
+  }
+ },
+ {
+  "id": "c059",
+  "utterance": "每天早上 7 点半给我播报天气",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "create"
+   ],
+   "kind": [
+    "weather-brief"
+   ]
+  }
+ },
+ {
+  "id": "c060",
+  "utterance": "我都设了哪些提醒",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "list"
+   ]
+  }
+ },
+ {
+  "id": "c061",
+  "utterance": "把喝水的提醒取消",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "cancel",
+    "list"
+   ]
+  }
+ },
+ {
+  "id": "c062",
+  "utterance": "晚上 11 点到早上 8 点别打扰我",
+  "tool": "reminder",
+  "args": {
+   "action": [
+    "quiet_hours"
+   ]
+  }
+ },
+ {
+  "id": "c063",
+  "utterance": "撤回",
+  "tool": "undo_last_action"
+ },
+ {
+  "id": "c064",
+  "utterance": "刚才那个不要了，换回去",
+  "tool": "undo_last_action"
+ },
+ {
+  "id": "c065",
+  "utterance": "恢复原样",
+  "tool": "undo_last_action"
+ },
+ {
+  "id": "c066",
+  "utterance": "把现在的桌面存成工作模式",
+  "tool": "desktop_mode",
+  "args": {
+   "action": [
+    "save"
+   ]
+  }
+ },
+ {
+  "id": "c067",
+  "utterance": "切到工作模式",
+  "tool": "desktop_mode",
+  "args": {
+   "action": [
+    "apply"
+   ]
+  }
+ },
+ {
+  "id": "c068",
+  "utterance": "我存过哪些桌面模式",
+  "tool": "desktop_mode",
+  "args": {
+   "action": [
+    "list"
+   ]
+  }
+ },
+ {
+  "id": "c069",
+  "utterance": "帮我布置一个极简桌面",
+  "tool": "desktop_scene_preview"
+ },
+ {
+  "id": "c070",
+  "utterance": "来个夜间专注的桌面方案",
+  "tool": "desktop_scene_preview"
+ },
+ {
+  "id": "c071",
+  "utterance": "桌面布局弄好看一点",
+  "tool": "desktop_scene_preview"
+ },
+ {
+  "id": "c072",
+  "utterance": "让桌宠跳一下",
+  "tool": "pet_express"
+ },
+ {
+  "id": "c073",
+  "utterance": "让桌宠跟我打个招呼",
+  "tool": "pet_express"
+ },
+ {
+  "id": "c074",
+  "utterance": "记住我喜欢毛玻璃风格的组件",
+  "tool": "memory_store",
+  "args": {
+   "kind": [
+    "preference"
+   ]
+  }
+ },
+ {
+  "id": "c075",
+  "utterance": "记住我的生日是 3 月 5 号",
+  "tool": "memory_store"
+ },
+ {
+  "id": "c076",
+  "utterance": "你还记得我喜欢什么颜色吗",
+  "tool": "memory_recall"
+ },
+ {
+  "id": "c077",
+  "utterance": "今天天气怎么样",
+  "tool": "weather"
+ },
+ {
+  "id": "c078",
+  "utterance": "明天杭州会下雨吗",
+  "tool": "weather"
+ },
+ {
+  "id": "c079",
+  "utterance": "现在几点",
+  "tool": "get_current_time"
+ },
+ {
+  "id": "c080",
+  "utterance": "有什么热搜",
+  "tool": "news"
+ },
+ {
+  "id": "c081",
+  "utterance": "搜一下 Electron 39 有什么新特性",
+  "tool": "web_search"
+ },
+ {
+  "id": "c082",
+  "utterance": "我在哪个城市",
+  "tool": "get_user_location"
+ },
+ {
+  "id": "c083",
+  "utterance": "我电脑什么配置",
+  "tool": "get_system_info"
+ },
+ {
+  "id": "c084",
+  "utterance": "算一下 1234 乘 5678",
+  "tool": "calculator"
+ },
+ {
+  "id": "c085",
+  "utterance": "看看我剪贴板里是什么",
+  "tool": "read_clipboard"
+ },
+ {
+  "id": "c086",
+  "utterance": "把这句话复制到剪贴板：明天见",
+  "tool": "write_clipboard"
+ },
+ {
+  "id": "c087",
+  "utterance": "打开 bilibili 网站",
+  "tool": "open_url"
+ },
+ {
+  "id": "c088",
+  "utterance": "去 FlowWall 逛逛有什么新壁纸",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "flowwall"
+   ]
+  }
+ },
+ {
+  "id": "c089",
+  "utterance": "打开在线壁纸发现页",
+  "tool": "wallpaper",
+  "args": {
+   "action": [
+    "flowwall",
+    "online_search"
+   ]
+  }
+ }
+]

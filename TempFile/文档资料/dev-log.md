@@ -5,6 +5,26 @@
 
 历史归档：[2026-08](archive/dev-log-2026-08.md) · [2026-05](archive/dev-log-2026-05.md) · [2026-04](archive/dev-log-2026-04.md)。主页和归档不重复保存同一条事件。
 
+## [2026-10-08] 1.2.0 合入已发布的 1.1.14，仓库改名与 LavaNotes 上线
+
+**变更摘要**: 用户把仓库改名为 `chengcczzjj/LavaDesk` 并新建 `chengcczzjj/LavaNotes`，授权合并与提交。LavaNotes 1.0.0 源码已推送到其 main（CI 通过）。按授权把任务分支快进到 main 并触发 1.2.0 发布后，发现 1.1.14 已于 09-27 从 `claude/blissful-ritchie-iemaxr` 发布却从未合入 main；为避免 1.2.0 覆盖掉 1.1.14 的功能，在“安装依赖”步骤取消了该次运行（未生成 tag/Release），随后把该分支合入 1.2.0。`claude/nice-davinci-47j62f` 上 09-29 未发布的壁纸区界面改版未合入。
+
+**涉及模块**:
+- 冲突处理：`toolRouter.ts` 采用 1.1.14 的常驻工具与固定提示前缀，组件说明中的便笺任务改为 `open_lavanotes`；`tool-manifest.ts` 保留 `journal` 标记并去掉 `manage_todo_tasks`；`index.ts` 保留迁移模块为第一个 import，并保留提醒、快捷对话热键、`lingyue://` 深链。
+- 1.1.14 新代码中引用内置便利贴的部分：快捷工具“便签”按钮改为经 `LAVANOTES_OPEN`（新增 canvas 发送方）新建 LavaNotes 便签，未安装时打开“便签”页；桌面现状摘要与 `desktopState.ts` 去掉 `todo-board` 分支；评测集 c026–c028 改为 `open_lavanotes`。
+- 用户可见的应用名：FlowWall 下载确认、登录提示和壁纸工具说明里指应用的“灵月”改为 LavaDesk；伴侣说话场景（灵月提醒、灵月快捷对话、“灵月截图”文件夹）保持原名。协议显示名改为 LavaDesk，`lingyue://` 协议本身不变。
+- 文档：经验 L15–L17 来自 1.1.14，改名经验顺延为 L18；状态、知识索引、AGENTS、1.2.0 发布说明同步。
+
+**验证结果**:
+- `npm test`：typecheck、lint 通过；单元/契约 142 项中 141 通过，1 项为已知依赖 Windows 路径分隔符的桌面图标导入测试。
+- `npm run build:check` 通过；产物中迁移在任何 Store/数据库创建前执行。`ELECTRON_DISABLE_SANDBOX=1` 下 Electron 冒烟五组（协议沙箱、壁纸渲染、显示工具栏、快捷对话、FlowWall 下载）全部通过。
+- 未在 Windows 实机验证；LavaNotes 1.0.0 与 LavaDesk 1.2.0 的发布在本条提交之后进行。
+
+**经验关联**: L15–L17（随 1.1.14 合入），L18（编号调整）。
+**提交意图**: `merge: bring released 1.1.14 into LavaDesk 1.2.0`
+
+---
+
 ## [2026-10-07] 灵月桌面改名 LavaDesk、便签拆分为独立软件 LavaNotes
 
 **变更摘要**: 按用户要求统一 Lava 命名并把便签拆成独立开源软件：本仓库移除画布内置便利贴，改为检测/唤起 LavaNotes；应用标识、安装包、数据目录与更新源改为 LavaDesk，首次启动自动迁移灵月桌面的旧数据。LavaNotes 1.0.0（透明纸张窗口、钉在桌面、图片/表格、待办）已在本地仓库完成并提交，等待用户创建 `chengcczzjj/LavaNotes` 后推送。
@@ -21,8 +41,69 @@
 - Linux 打包版对伪造旧目录实测迁移：标记 done、配置改名、快捷方式路径改写、缓存跳过。未在 Windows 实机验证关闭旧进程、开机启动清理、卸载提示与 `lavanotes://` 检测。
 - GitHub：创建仓库返回 403、无改名工具，FlowWallDesk → LavaDesk 改名与 LavaNotes 建库需用户操作；1.2.0 未发布。
 
-**经验关联**: L06（替代）、L15（新增）。
+**经验关联**: L06（替代）、L18（新增）。
 **提交意图**: `feat(desktop): rename to LavaDesk, move sticky notes to LavaNotes and migrate LingyueDesk data`
+
+---
+
+## [2026-09-27] 发布 1.1.14：伙伴桌面操作、快捷对话、FlowWall 在线壁纸库
+
+**变更摘要**: 按用户“打包发布新版本”的要求，将 1.1.13 之后两轮开发（伴侣桌面控制与快捷对话、FlowWall 在线壁纸库与交互/组件升级）作为 1.1.14 发布；未合入 main，Release 由任务分支提交构建。
+
+**涉及模块**:
+- 版本与说明：`package.json` / `package-lock.json` 升至 1.1.14，新增 [1.1.14 发布说明](../../doc/发布说明/1.1.14.md)；`scripts/verify-windows-release.mjs` 要求安装包含快捷对话入口（首个带该窗口的版本），摘要文案同步为四个渲染入口。
+- 发布：在 `claude/blissful-ritchie-iemaxr` 上手动运行 Windows 发布流程（Actions 运行 36294078856），构建 `90ff7f6` 并在发布时创建 tag `v1.1.14`。
+
+**验证结果**:
+- 容器内：`npm test` 152 项 151 通过（Linux 路径基线用例），`npm run build:check` 成功。
+- Windows 运行器：`npm test` 152/152 通过，Electron 冒烟五组通过，NSIS 构建成功，核验脚本确认 latest.yml、安装包、app.asar 版本与四个入口一致；草稿资产大小核对后发布，公开 latest.yml 与构建一致，releases/latest 指向 v1.1.14。
+- 会话内独立复核：Release 非草稿/预发布，tag 指向 `90ff7f6`，三项资产齐全；完整下载安装包 369,500,151 bytes，SHA-512 与 latest.yml 一致，SHA-256 `C8FC76691A16667524938FCD403A224DB4CE708D48E7E89657AA99CBA284F0A7`；blockmap 388,469 bytes、latest.yml 的 SHA-256 与 GitHub 资产摘要一致。
+- 自动生成的 Release 构建校验摘要仍写“三个渲染入口”（发布时脚本文案未更新，检查本身已含快捷对话），本次已修正文案供下次使用。
+- 未在 Windows 实机安装，也未实测客户端从 1.1.13 自动升级。
+
+**提交意图**: `docs(release): record 1.1.14 remote delivery`
+
+---
+
+## [2026-09-27] FlowWall 在线壁纸库接入与伴侣交互、桌面组件升级
+
+**变更摘要**: 新增“FlowWall 发现”内嵌在线壁纸库：接管站点自己的下载，按内容校验后导入「我的壁纸」并可一键设为壁纸，另有 `lingyue://` 协议；对上一轮伴侣功能做交互复查升级（确认卡键盘与倒计时、回执状态与全部撤回、快捷对话输入/粘贴/拖入、热键录制与授权收回）；快捷工具、系统监控接入真实功能，白噪音定时关闭，桌宠悬停/点击回应/未读红点。设计见 [FlowWall 在线壁纸库接入设计](../../doc/FlowWall在线壁纸库接入设计.md) 与 [伴侣智能体桌面控制设计](../../doc/伴侣智能体桌面控制设计.md) §8。
+
+**涉及模块**:
+- `src/shared/flowwall.ts` / `media-signature.ts` / `main/services/flowwall-library.ts` / `ipc/flowwallIpc.ts` / `main/index.ts` / `electron-builder.yml` / `renderer/main-ui/pages/FlowWallPage.tsx`: 隔离分区视图、导航分类、下载状态机、判重与内容校验、协议注册（仅安装版）。
+- `src/renderer/shared/chat/*` / `quick-chat/QuickChat.tsx` / `pages/chat/ChatPage.tsx` / `ipc/chatIpc.ts` / `desktop/attachmentStore.ts` / `actionJournal.ts` / `actionPolicy.ts` / `ipc/companionIpc.ts` / `settings/SettingsGeneralPage.tsx`: 交互升级；粘贴/拖入只传字节。
+- `src/renderer/widgets/{Pet,WhiteNoise,QuickTools,SysMonitor}` / `main/services/system-stats.ts` / `ipc/appIpc.ts` / `shared/canvas-hit-test.ts`: 组件升级；桌宠与快捷工具移出被动名单。
+- 修复：小文件先于判重完成导致同一壁纸导入两份；桌宠点击在 Windows 会穿透到桌面（被动名单遗漏，见 L16）。
+
+**验证结果**:
+- `npm test`：类型检查、lint 通过；152 项测试 151 通过，失败项仍为基线提交上同样失败的 Windows 路径用例（已在基线工作树复现）。新增 `flowwall.test.mjs` 12 项（判重竞态用例在旧逻辑下失败）、`companion-ux.test.mjs` 6 项。
+- `npm run build:check` 成功；`ELECTRON_DISABLE_SANDBOX=1` 下冒烟五组通过，含新增 flowwall 组与扩充的 quick-chat 组。
+- 临时 Playwright 脚本驱动真实应用：FlowWall 页（本地替身站点）下载→导入→设为壁纸、重复、伪装文件拒绝、对话框遮挡与面板让位；伴侣快捷对话添加/撤回/截屏确认/提醒；组件实测 CPU/内存、便签新增、白噪音定时环、桌宠红点；设置页热键录制与授权收回，均通过并人工检查截图；脚本未提交。
+- 未验证：容器网络拦截 `www.flowwall.ai`，真实站点下载按钮与登录未测；Windows 实机的点击穿透、`ms-screenclip:`、视图 DPI 贴合、协议注册未测。
+
+**经验关联**: L16、L17（新增），L15（补充），L10。
+**提交意图**: `feat(wallpaper): FlowWall online library, companion UX and widget upgrades`
+
+---
+
+## [2026-09-26] 伴侣智能体桌面控制迭代：常驻工具、确认挂起、回执撤回与快捷对话
+
+**变更摘要**: 按调研方案重做聊天智能体的桌面控制底座并补齐能力：桌面类工具每轮常驻，确认由界面挂起执行，桌面改动有回执和撤回；新增壁纸、应用、系统、白噪音、桌宠、提醒、桌面模式、附件工具，以及全局热键/桌宠唤出的快捷对话。设计见 [伴侣智能体桌面控制设计](../../doc/伴侣智能体桌面控制设计.md)。
+
+**涉及模块**:
+- `src/main/memory/tools/toolRouter.ts` / `chat/toolExecution.ts` / `chat/chatService.ts` / `routing/contextPacker.ts`: 常驻工具与固定提示前缀；策略→确认→快照→执行→回执的托管执行；时间/记忆/桌面现状/最近操作放尾部；图片附件直接给看图模型。
+- `src/main/memory/desktop/*` / `tools/definitions/desktop-control.ts` / `ipc/wallpaperIpc.ts` / `ipc/widgetIpc.ts`: 桌面状态差异与撤回、确认策略与挂起、应用索引、系统控制、提醒调度、桌面模式、附件授权；壁纸/组件导出 `*ForTool` 复用原队列。
+- `src/renderer/quick-chat/` / `windows/quickChatWindow.ts` / `ipc/companionIpc.ts` / `preload/*`: 独立 quick-chat 窗口角色、全局热键、托盘入口；ChatPage 与快捷对话共用 Markdown、确认卡、回执、附件组件；桌宠与白噪音接收画布组件指令。
+- 修复：`open_url`/剪贴板/记忆工具 `success` 口径导致失败显示为已处理；删除 Dock 的确认改由界面执行；写操作后仍命中缓存的只读结果；天气工具描述乱码；审批卡把 critical 显示为中风险；场景模板无效桌宠状态。
+
+**验证结果**:
+- Linux 容器：`npm test` 类型检查、lint 通过，134 项测试 133 通过；失败项为基线即失败的 Windows 路径分隔符用例。新增 `tests/companion-agent.test.mjs` 17 项（含 87 句指令可达性评测）。
+- `npm run build:check` 成功；`ELECTRON_DISABLE_SANDBOX=1`（容器以 root 运行）下 Electron 冒烟四组通过，含新增 quick-chat 组。
+- 临时脚本 + 本地伪 OpenAI 兼容模型 + Playwright 驱动真实应用：快捷对话添加组件→回执→撤回、截屏确认卡→同意后原参数执行、下一轮摘要含已撤回、交接主界面后拒绝确认返回 declined，均通过；未提交该脚本。
+- 未用真实模型跑 `eval:companion`（容器无 API Key）；未在 Windows 实机验证热键、`SendInput`、应用唤起、通知与多屏落位。
+
+**经验关联**: L15（新增），L09。
+**提交意图**: `feat(agent): companion desktop control with confirmations, undo and quick chat`
 
 ---
 

@@ -4,17 +4,19 @@ import { IPC } from '@shared/ipc-channels'
 import { getMainWindow, createMainWindow } from '../windows/mainWindow'
 import type { MainWindowNavTarget } from '../windows/mainWindow'
 import { getLocationPrivacySettings, requestPreciseLocationAuthorization, setPreciseLocationEnabled, validatePreciseLocationEnabled } from '../memory/tools/definitions/user-location'
-import { assertTrustedIpcSender } from './ipcSecurity'
+import { assertTrustedIpcSender, isTrustedIpcSender } from './ipcSecurity'
 import { getLaunchAtLoginStatus, setLaunchAtLoginEnabled } from '../services/launch-at-login-service'
 import { checkForAppUpdates, downloadAppUpdate, getAppUpdateStatus, installDownloadedUpdate } from '../services/update-service'
 import { toggleWindowsDesktop } from '../windows/windowsDesktop'
 import { logDockDiagnostic } from '../runtime/diagnosticLog'
+import { captureScreen } from '../memory/desktop/systemControl'
+import { sampleSystemStats } from '../services/system-stats'
 import { getLavaNotesStatus, openLavaNotes, openLavaNotesDownload } from '../services/lavanotes-service'
 import type { LavaNotesCommand } from '@shared/types'
 
 const LAVANOTES_COMMANDS: readonly LavaNotesCommand[] = ['new', 'open', 'manager']
 
-function showMainWindow(target?: MainWindowNavTarget): void {
+export function showMainWindow(target?: MainWindowNavTarget): void {
   const win = getMainWindow() ?? createMainWindow(target)
   if (win.isMinimized()) win.restore()
   win.show()
@@ -98,10 +100,15 @@ export function registerAppIpc(): void {
     assertTrustedIpcSender(event, ['main'])
     return getLavaNotesStatus()
   })
-  ipcMain.handle(IPC.LAVANOTES_OPEN, (event, command: unknown) => {
-    assertTrustedIpcSender(event, ['main'])
+  ipcMain.handle(IPC.LAVANOTES_OPEN, async (event, command: unknown) => {
+    assertTrustedIpcSender(event, ['main', 'canvas'])
     if (!LAVANOTES_COMMANDS.includes(command as LavaNotesCommand)) throw new Error('invalid LavaNotes command')
-    return openLavaNotes(command as LavaNotesCommand)
+    const result = await openLavaNotes(command as LavaNotesCommand)
+    // The desktop quick tool has no room to explain a missing install; the 便签 page does.
+    if (!result.installed && isTrustedIpcSender(event, ['canvas'])) {
+      showMainWindow({ activity: 'widgets', subPage: 'widgets-tasks' })
+    }
+    return result
   })
   ipcMain.handle(IPC.LAVANOTES_DOWNLOAD, async (event) => {
     assertTrustedIpcSender(event, ['main'])
@@ -137,6 +144,26 @@ export function registerAppIpc(): void {
     } catch {
       return false
     }
+  })
+  // Quick tools: Windows' own snipping overlay; elsewhere a full-screen capture saved to Pictures.
+  ipcMain.handle(IPC.APP_SCREEN_SNIP, async (event) => {
+    assertTrustedIpcSender(event, ['canvas'])
+    if (process.platform === 'win32') {
+      try {
+        await shell.openExternal('ms-screenclip:')
+        return { ok: true, mode: 'snip' as const }
+      } catch {
+        // Older Windows builds without Snip & Sketch fall back to a saved capture.
+      }
+    }
+    const result = await captureScreen()
+    if (!result.ok || !result.files[0]) return { ok: false, mode: 'saved' as const, error: result.error ?? '截图失败' }
+    shell.showItemInFolder(result.files[0])
+    return { ok: true, mode: 'saved' as const }
+  })
+  ipcMain.handle(IPC.SYSTEM_STATS, (event) => {
+    assertTrustedIpcSender(event, ['canvas', 'main'])
+    return sampleSystemStats()
   })
   ipcMain.handle(IPC.APP_SHOW_DESKTOP, (event) => {
     assertTrustedIpcSender(event, ['main', 'canvas'])

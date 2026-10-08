@@ -3,6 +3,8 @@ export type ToolCategory =
   | 'memory'
   | 'widget'
   | 'desktop-scene'
+  | 'desktop'
+  | 'attachment'
   | 'workspace-read'
   | 'workspace-write'
   | 'document'
@@ -18,6 +20,11 @@ export interface ToolManifestEntry<Name extends string = string> {
   tracksAgentRun: boolean
   label: string
   compactLabel: string
+  /**
+   * The tool changes the desktop (widgets, wallpaper, display layout). The chat
+   * service snapshots that state around the call so the change can be undone.
+   */
+  journal?: true
 }
 
 function defineTool<const Name extends string>(entry: ToolManifestEntry<Name>): ToolManifestEntry<Name> {
@@ -38,18 +45,27 @@ export const TOOL_MANIFEST = [
   defineTool({ name: 'weather', category: 'companion', risk: 'read-only', cacheable: true, tracksAgentRun: false, label: '天气查询', compactLabel: '天气' }),
   defineTool({ name: 'news', category: 'companion', risk: 'read-only', cacheable: true, tracksAgentRun: false, label: '新闻热搜', compactLabel: '资讯' }),
   defineTool({ name: 'list_widgets', category: 'widget', risk: 'read-only', cacheable: true, tracksAgentRun: false, label: '查看组件', compactLabel: '组件' }),
-  defineTool({ name: 'add_widget', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '添加组件', compactLabel: '组件' }),
-  defineTool({ name: 'update_widget_config', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '调整组件', compactLabel: '组件' }),
-  defineTool({ name: 'arrange_widget', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '摆放组件', compactLabel: '组件' }),
-  defineTool({ name: 'update_generated_widget', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '修改生成组件', compactLabel: '组件' }),
-  defineTool({ name: 'remove_widget', category: 'widget', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '移除组件', compactLabel: '组件' }),
-  defineTool({ name: 'create_generated_widget', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '生成桌面组件', compactLabel: '组件' }),
+  defineTool({ name: 'add_widget', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '添加组件', compactLabel: '组件', journal: true }),
+  defineTool({ name: 'update_widget_config', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '调整组件', compactLabel: '组件', journal: true }),
+  defineTool({ name: 'arrange_widget', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '摆放组件', compactLabel: '组件', journal: true }),
+  defineTool({ name: 'update_generated_widget', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '修改生成组件', compactLabel: '组件', journal: true }),
+  defineTool({ name: 'remove_widget', category: 'widget', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '移除组件', compactLabel: '组件', journal: true }),
+  defineTool({ name: 'create_generated_widget', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '生成桌面组件', compactLabel: '组件', journal: true }),
   defineTool({ name: 'open_lavanotes', category: 'widget', risk: 'low', cacheable: false, tracksAgentRun: false, label: '打开便签', compactLabel: '便签' }),
   defineTool({ name: 'widget_capability_list', category: 'widget', risk: 'read-only', cacheable: true, tracksAgentRun: false, label: '组件能力', compactLabel: '组件' }),
   defineTool({ name: 'desktop_scene_get', category: 'desktop-scene', risk: 'read-only', cacheable: true, tracksAgentRun: false, label: '桌面上下文', compactLabel: '桌面编排' }),
   defineTool({ name: 'desktop_scene_preview', category: 'desktop-scene', risk: 'read-only', cacheable: true, tracksAgentRun: false, label: '桌面草案', compactLabel: '桌面编排' }),
-  defineTool({ name: 'desktop_scene_apply', category: 'desktop-scene', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '应用桌面草案', compactLabel: '桌面编排' }),
-  defineTool({ name: 'desktop_scene_rollback', category: 'desktop-scene', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '回滚桌面布局', compactLabel: '桌面编排' }),
+  defineTool({ name: 'desktop_scene_apply', category: 'desktop-scene', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '应用桌面草案', compactLabel: '桌面编排', journal: true }),
+  defineTool({ name: 'desktop_scene_rollback', category: 'desktop-scene', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '回滚桌面布局', compactLabel: '桌面编排', journal: true }),
+  defineTool({ name: 'wallpaper', category: 'desktop', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '壁纸', compactLabel: '壁纸', journal: true }),
+  defineTool({ name: 'desktop_mode', category: 'desktop', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '桌面模式', compactLabel: '桌面模式', journal: true }),
+  defineTool({ name: 'ambient_sound', category: 'desktop', risk: 'low', cacheable: false, tracksAgentRun: false, label: '白噪音', compactLabel: '白噪音', journal: true }),
+  defineTool({ name: 'app_control', category: 'desktop', risk: 'high', cacheable: false, tracksAgentRun: false, label: '打开应用', compactLabel: '应用' }),
+  defineTool({ name: 'system_control', category: 'desktop', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '系统操作', compactLabel: '系统' }),
+  defineTool({ name: 'pet_express', category: 'desktop', risk: 'low', cacheable: false, tracksAgentRun: false, label: '桌宠互动', compactLabel: '桌宠' }),
+  defineTool({ name: 'reminder', category: 'desktop', risk: 'low', cacheable: false, tracksAgentRun: false, label: '提醒', compactLabel: '提醒' }),
+  defineTool({ name: 'undo_last_action', category: 'desktop', risk: 'medium', cacheable: false, tracksAgentRun: false, label: '撤回操作', compactLabel: '撤回' }),
+  defineTool({ name: 'read_attachment', category: 'attachment', risk: 'read-only', cacheable: true, tracksAgentRun: false, label: '读取附件', compactLabel: '附件' }),
   defineTool({ name: 'list_directory', category: 'workspace-read', risk: 'read-only', cacheable: true, tracksAgentRun: true, label: '列目录', compactLabel: '读取' }),
   defineTool({ name: 'read_file', category: 'workspace-read', risk: 'read-only', cacheable: true, tracksAgentRun: true, label: '读取文件', compactLabel: '读取' }),
   defineTool({ name: 'search_text', category: 'workspace-read', risk: 'read-only', cacheable: true, tracksAgentRun: true, label: '搜索文本', compactLabel: '搜索' }),

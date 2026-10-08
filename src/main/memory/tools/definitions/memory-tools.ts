@@ -18,19 +18,21 @@ export const memoryStoreTool = tool({
     key: z.string().trim().min(1).max(80).describe('记忆的简短标签/分类，如 "用户生日"、"喜欢的颜色"、"工作信息"'),
     content: z.string().trim().min(1).max(1000).describe('要记住的具体内容'),
     importance: z.enum(['low', 'medium', 'high']).optional().describe('重要程度'),
+    kind: z.enum(['fact', 'preference']).optional().describe('fact 关于用户的事实；preference 用户的偏好（喜欢的桌面风格、配色、摆放、壁纸类型、称呼和说话方式等）。'),
   }),
-  execute: async ({ key, content, importance = 'medium' }) => {
+  execute: async ({ key, content, importance = 'medium', kind = 'fact' }) => {
     try {
       const action = MemoryStore.upsert({
         key,
         content,
         importance,
-        scope: 'user',
+        scope: kind === 'preference' ? 'preference' : 'user',
+        ...(kind === 'preference' ? { memoryType: 'preference' } : {}),
         sensitivity: 'normal',
       })
-      return { success: true, action, key }
+      return { ok: true, action, key, kind }
     } catch (e) {
-      return { success: false, error: (e as Error).message }
+      return { ok: false, error: (e as Error).message }
     }
   },
 })

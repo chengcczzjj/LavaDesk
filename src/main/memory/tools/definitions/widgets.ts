@@ -332,22 +332,13 @@ export const updateGeneratedWidgetTool = tool({
 })
 
 export const removeWidgetTool = tool({
-  description: '从桌面移除一个组件。只是暂时不想看到时优先用 arrange_widget(visible=false)。Dock 和图标收纳里存放着用户的桌面图标，只有用户明确要求删除并确认后才能移除（confirmed=true）。',
+  description: '从桌面移除一个组件。只是暂时不想看到时优先用 arrange_widget(visible=false)。Dock 和图标收纳里存放着用户的桌面图标，删除前界面会弹出确认卡，由用户点头后才会执行。',
   inputSchema: z.object({
     id: z.string().optional().describe('组件 id。已知具体组件时优先使用。'),
     type: z.enum(WIDGET_TYPES).optional().describe('组件类型。没有 id 时可用类型定位已有组件。'),
-    confirmed: z.boolean().optional().describe('用户已明确确认删除 Dock/图标收纳时为 true。'),
   }),
-  execute: async ({ id, type, confirmed }) => {
-    const target = listWidgetsForTool().find((widget) => (id ? widget.id === id : widget.type === type))
-    if (target && PERSISTENT_WIDGET_TYPES.has(target.type) && confirmed !== true) {
-      return {
-        ok: false,
-        deleted: false,
-        error: 'confirmation-required',
-        guidance: '这是存放桌面图标的常驻组件。先向用户确认是否删除（图标会尽量移回桌面），用户同意后再以 confirmed=true 调用。',
-      }
-    }
+  // The chat surface asks the user before a Dock / icon box is removed (action policy), then this runs.
+  execute: async ({ id, type }) => {
     const result = await removeWidgetForTool({ id, type })
     return {
       ok: result.ok,

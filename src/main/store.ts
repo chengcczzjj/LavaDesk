@@ -1,6 +1,9 @@
 import Store from 'electron-store'
 import type { WallpaperState, WidgetInstance, ModelProfile, WallpaperDisplayMode } from '@shared/types'
 import type { DesktopSceneSnapshot } from '@shared/desktop-scene'
+import type { Reminder } from '@shared/reminders'
+import type { CompanionSettings, DesktopMode } from '@shared/companion-settings'
+import type { FlowWallDownload } from '@shared/flowwall'
 
 interface ModelSettings {
   profiles: ModelProfile[]
@@ -46,6 +49,18 @@ interface Schema {
   privacySettings: PrivacySettings
   /** 应用生命周期设置 */
   appSettings: AppSettings
+  /** 伴侣提醒（主进程定时触发） */
+  reminders?: Reminder[]
+  /** 伴侣行为设置：快捷对话热键、安静时段 */
+  companionSettings?: CompanionSettings
+  /** 用户让伴侣保存的桌面模式 */
+  desktopModes?: DesktopMode[]
+  /** 用户选择“以后都允许”的桌面动作（如启动某个应用、截图） */
+  agentActionGrants?: string[]
+  /** 桌面快捷对话使用的会话 */
+  quickChatConversationId?: string
+  /** FlowWall 在线壁纸站的下载记录（去重与历史） */
+  flowwallDownloads?: FlowWallDownload[]
 }
 
 const defaults: Schema = {

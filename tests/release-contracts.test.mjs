@@ -222,4 +222,6 @@ test('Windows release workflow verifies assets before publishing and never overw
   assert.match(verifier, /manifest\.sha512 === sha512/)
   assert.match(verifier, /entry\?\.size === installerStat\.size/)
   assert.match(verifier, /packagedJson\.version === version/)
+  // Every window the app opens must be inside the package, including the quick chat.
+  for (const entry of ['main-ui', 'wallpaper', 'canvas', 'quick-chat']) assert.match(verifier, new RegExp(`'/out/renderer/${entry}/index\\.html'`))
 })

@@ -3,6 +3,7 @@ import { existsSync, realpathSync, statSync } from 'node:fs'
 import { ipcMain, dialog, clipboard, shell } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
+import { MAX_ATTACHMENT_BYTES } from '@shared/chat-attachments'
 import { IPC } from '@shared/ipc-channels'
 import { DEFAULT_CHAT_PERSONA } from '@shared/persona'
 import { ChatService } from '../memory/chat/chatService'
@@ -21,13 +22,25 @@ import { store } from '../store'
 import type { ConversationMode } from '../memory/events/types'
 import type { ModelProfile } from '../memory/models/config'
 import type { AgentApprovalDecision, AgentFileChangeReviewState, ChatMemory, WorkspacePermissionProfile } from '@shared/types'
+import type { ActionConfirmRequest } from '@shared/agent-actions'
 import { assertTrustedIpcSender, isTrustedIpcSender } from './ipcSecurity'
+import { cancelActionConfirmations, requestActionConfirmation, resolveActionConfirmation } from '../memory/desktop/confirmationBroker'
+import { ActionJournal } from '../memory/desktop/actionJournal'
+import { AttachmentStore } from '../memory/desktop/attachmentStore'
+import { expressPet } from '../memory/desktop/petBridge'
+import { clearDesktopScenePreviewForTool } from './widgetIpc'
+import { getQuickChatWindow, isQuickChatVisible, showQuickChat } from '../windows/quickChatWindow'
+import { getMainWindow } from '../windows/mainWindow'
 
 /** 当前正在进行的流式任务，用于 stop */
 const activeStreams = new Map<string, AbortController>()
 const grantedProjectRoots = new Set<string>()
 
 const idSchema = z.string().min(1).max(128)
+const attachDataSchema = z.array(z.object({
+  name: z.string().min(1).max(260),
+  bytes: z.instanceof(Uint8Array).refine((bytes) => bytes.byteLength <= MAX_ATTACHMENT_BYTES, '文件太大'),
+})).min(1).max(8)
 const nullableIdSchema = idSchema.nullable()
 const conversationModeSchema = z.enum(['daily', 'work', 'private', 'tool'])
 const modelProfileSchema = z.object({
@@ -44,6 +57,7 @@ const modelProfileSchema = z.object({
   capabilities: z.object({
     toolCalling: z.enum(['auto', 'native', 'disabled']).optional(),
     reasoning: z.boolean().optional(),
+    vision: z.boolean().optional(),
     maxContextTokens: z.number().int().min(4096).max(10_000_000).optional(),
     maxOutputTokens: z.number().int().min(256).max(1_000_000).optional(),
   }).optional(),
@@ -57,6 +71,7 @@ const chatSendRequestSchema = z.object({
     text: z.string().trim().min(1).max(100_000),
     internal: z.boolean().optional(),
     forceAgentRun: z.boolean().optional(),
+    attachmentIds: z.array(z.string().min(1).max(40)).max(8).optional(),
   }),
 })
 const automationCreateSchema = z.object({
@@ -112,6 +127,22 @@ function handleMain(
     assertTrustedIpcSender(event, ['main'])
     return listener(event, ...args)
   })
+}
+
+/** Channels both chat surfaces use: the main chat page and the desktop quick chat. */
+function handleChatSurface(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedIpcSender(event, ['main', 'quick-chat'])
+    return listener(event, ...args)
+  })
+}
+
+function replyExcerpt(text: string): string {
+  const plain = text.replace(/[#*`>|_~-]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return plain.length > 60 ? `${plain.slice(0, 58)}…` : plain
 }
 
 function isInside(rootPath: string, targetPath: string): boolean {
@@ -195,7 +226,7 @@ export function registerChatIpc(): void {
   ipcMain.on(
     IPC.CHAT_SEND_MESSAGE,
     (event, request: unknown) => {
-      if (!isTrustedIpcSender(event, ['main'])) return
+      if (!isTrustedIpcSender(event, ['main', 'quick-chat'])) return
       const parsed = chatSendRequestSchema.safeParse(request)
       if (!parsed.success) return
       const { streamId, payload } = parsed.data
@@ -212,6 +243,7 @@ export function registerChatIpc(): void {
             text: payload.text,
             internal: payload.internal,
             forceAgentRun: payload.forceAgentRun,
+            attachmentIds: payload.attachmentIds,
             abortSignal: controller.signal,
           },
           {
@@ -224,6 +256,10 @@ export function registerChatIpc(): void {
               activeStreams.delete(streamId)
               if (!sender.isDestroyed()) {
                 sender.send(IPC.CHAT_STREAM_END, { streamId, full, conversationId })
+              }
+              // A quick-chat reply that lands after the window was dismissed is said by the desktop pet.
+              if (sender.id === getQuickChatWindow()?.webContents.id && !isQuickChatVisible() && full.trim()) {
+                expressPet({ state: 'speaking', message: replyExcerpt(full), durationMs: 10_000 })
               }
             },
             onError(error) {
@@ -242,6 +278,24 @@ export function registerChatIpc(): void {
                 sender.send(IPC.AGENT_RUN_EVENT, { streamId, ...runEvent })
               }
             },
+            requestConfirmation(request) {
+              return requestActionConfirmation({
+                request: { ...request, streamId },
+                abortSignal: controller.signal,
+                send: (payload: ActionConfirmRequest) => {
+                  if (sender.isDestroyed()) return false
+                  sender.send(IPC.CHAT_ACTION_CONFIRM_REQUEST, payload)
+                  // The card must be seen to be answered: reopen the quick chat, or flash the main window.
+                  if (sender.id === getQuickChatWindow()?.webContents.id) {
+                    if (!isQuickChatVisible()) showQuickChat()
+                  } else {
+                    const main = getMainWindow()
+                    if (main && main.webContents.id === sender.id && !main.isFocused()) main.flashFrame(true)
+                  }
+                  return true
+                },
+              })
+            },
           }
         ).catch((error: unknown) => {
           activeStreams.delete(streamId)
@@ -253,13 +307,68 @@ export function registerChatIpc(): void {
     }
   )
 
-  handleMain(IPC.CHAT_STOP_STREAM, (_e, streamId: string) => {
+  handleChatSurface(IPC.CHAT_STOP_STREAM, (_e, streamId: string) => {
     streamId = z.string().uuid().parse(streamId)
+    cancelActionConfirmations(streamId)
     const controller = activeStreams.get(streamId)
     if (!controller) return { ok: false, error: '没有找到正在运行的任务。' }
     controller.abort()
     activeStreams.delete(streamId)
     return { ok: true }
+  })
+
+  handleChatSurface(IPC.CHAT_ACTION_CONFIRM_RESOLVE, (_e, confirmId: string, decision: string) => {
+    const parsedDecision = z.enum(['allow', 'allow-always', 'deny']).parse(decision)
+    return resolveActionConfirmation(z.string().uuid().parse(confirmId), parsedDecision)
+  })
+
+  handleChatSurface(IPC.CHAT_ACTION_UNDO, async (_e, journalId: string) => {
+    const result = await ActionJournal.undo(z.string().min(1).max(20).parse(journalId))
+    return { ok: result.ok, error: result.error, summary: result.entry?.summary }
+  })
+
+  handleChatSurface(IPC.CHAT_ACTION_STATUS, (_e, ids: unknown) => {
+    return ActionJournal.status(z.array(z.string().min(1).max(20)).max(60).parse(ids))
+  })
+
+  // The user picks attachments in a native dialog, so every granted path is one they chose.
+  handleChatSurface(IPC.CHAT_ATTACH_FILES, async (event, conversationId?: string | null) => {
+    const owner = event.sender.id === getQuickChatWindow()?.webContents.id ? getQuickChatWindow() : null
+    const options: Electron.OpenDialogOptions = {
+      title: '添加照片和文件',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: '图片和文档', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'pdf', 'docx', 'xlsx', 'txt', 'md', 'csv', 'json', 'log'] },
+        { name: '所有文件', extensions: ['*'] },
+      ],
+    }
+    const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options)
+    if (result.canceled || result.filePaths.length === 0) return { attachments: [], rejected: [] }
+    return AttachmentStore.register(result.filePaths, conversationId ? idSchema.parse(conversationId) : null)
+  })
+
+  // Paste / drag-and-drop: the renderer sends file contents it was handed, never a path.
+  handleChatSurface(IPC.CHAT_ATTACH_DATA, async (_event, files: unknown, conversationId?: string | null) => {
+    const parsed = attachDataSchema.parse(files)
+    return AttachmentStore.registerData(
+      parsed.map((file) => ({ name: file.name, bytes: file.bytes })),
+      conversationId ? idSchema.parse(conversationId) : null,
+    )
+  })
+
+  handleChatSurface(IPC.CHAT_DESKTOP_SCENE_CLEAR_PREVIEW, () => {
+    clearDesktopScenePreviewForTool()
+    return true
+  })
+
+  handleChatSurface(IPC.CHAT_GET_QUICK_CONVERSATION, (_e, options?: { reset?: boolean }) => {
+    const savedId = options?.reset ? undefined : store.get('quickChatConversationId')
+    const conversation = ChatService.getOrCreateConversation(savedId)
+    if (conversation.id !== savedId) {
+      store.set('quickChatConversationId', conversation.id)
+      if (!conversation.title) ChatService.renameConversation(conversation.id, '桌面快聊')
+    }
+    return { conversationId: conversation.id, history: ChatService.getHistory(conversation.id, 40) }
   })
 
   handleMain(
@@ -272,7 +381,7 @@ export function registerChatIpc(): void {
     () => ChatService.listConversations()
   )
 
-  handleMain(
+  handleChatSurface(
     IPC.CHAT_GET_HISTORY,
     (_e, conversationId: string, limit?: number) => ChatService.getHistory(conversationId, limit)
   )

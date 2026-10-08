@@ -12,7 +12,9 @@ import {
 } from '@shared/desktop-scene'
 import { buildDesktopSceneLayoutPlan, type DesktopSceneLayoutPlan } from '@shared/desktop-scene-layout'
 import { describeWidgetConfigSpec, pickWidgetSettings } from '@shared/widget-config-spec'
+import { PET_EXPRESSION_STATES, type PetExpressionState } from '@shared/widget-command'
 import { store } from '../../../store'
+import { expressPet } from '../../desktop/petBridge'
 import {
   applyDesktopScenePlanForTool,
   listWidgetsForTool,
@@ -259,6 +261,9 @@ export const desktopSceneApplyTool = tool({
       plan,
       reason: reason?.trim() || `应用 ${template.displayName}`,
     })
+    if (result.ok && template.petState && (PET_EXPRESSION_STATES as readonly string[]).includes(template.petState)) {
+      expressPet({ state: template.petState as PetExpressionState, durationMs: 4000 })
+    }
 
     return {
       ok: result.ok,

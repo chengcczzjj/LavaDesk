@@ -114,11 +114,12 @@ test('agent widget tools: layout tool, validated edits and follow-up routing', a
   assert.match(manifest, /name: 'widget_capability_list', category: 'widget'/)
   assert.match(widgetTools, /export const updateWidgetConfigTool[\s\S]*normalizeWidgetConfigPatch\(widgetType/)
   assert.match(widgetTools, /export const addWidgetTool[\s\S]*normalizeWidgetConfigPatch\(type/)
-  assert.match(widgetTools, /error: 'confirmation-required'/)
+  // Deleting a Dock / icon box is confirmed by the chat surface, not by a flag the model can set itself.
+  assert.doesNotMatch(widgetTools, /confirmed/)
   assert.match(widgetTools, /estimateGeneratedWidgetHeight\(definition, width\)/)
   assert.doesNotMatch(widgetTools, /config: widget\.config \?\? \{\}/)
   assert.match(router, /recentlyUsedCategory\(params\.recentToolNames, 'widget'\)/)
-  assert.match(chatService, /decideToolRoute\(\{ text, workspace, recentToolNames \}\)/)
+  assert.match(chatService, /decideToolRoute\(\{\s*text,\s*workspace,\s*recentToolNames,/)
   // Layout edits stay on the widget's own monitor, in the display-local space widgets are stored in.
   assert.match(widgetIpc, /export function arrangeWidgetForTool[\s\S]*getWidgetDisplayContext\(target\)[\s\S]*positionAtAnchor\(params\.anchor, layoutSize, context\.workArea\)/)
   assert.match(widgetIpc, /function placeWidgetOnDisplay[\s\S]*getWidgetsForDisplay\(list, context\.display\)/)

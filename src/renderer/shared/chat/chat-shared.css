@@ -1,0 +1,158 @@
+/* Shared by the main chat page and the desktop quick chat. */
+
+.ly-md { display: block; line-height: 1.62; word-break: break-word; }
+.ly-md--plain { white-space: pre-wrap; }
+.ly-md > :first-child { margin-top: 0; }
+.ly-md > :last-child { margin-bottom: 0; }
+.ly-md p { margin: 0 0 0.55em; }
+.ly-md ul, .ly-md ol { margin: 0.2em 0 0.6em; padding-left: 1.35em; }
+.ly-md li { margin: 0.15em 0; }
+.ly-md__heading { margin: 0.5em 0 0.35em; font-size: 1.02em; font-weight: 700; }
+.ly-md blockquote {
+  margin: 0.3em 0 0.6em;
+  padding: 0.2em 0 0.2em 0.8em;
+  border-left: 3px solid rgba(99, 102, 241, 0.35);
+  color: inherit;
+  opacity: 0.85;
+}
+.ly-md hr { border: none; border-top: 1px solid rgba(0, 0, 0, 0.1); margin: 0.7em 0; }
+.ly-md a { color: var(--accent, #6366f1); text-decoration: underline; text-underline-offset: 2px; }
+.ly-md__code {
+  padding: 0.08em 0.36em;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.07);
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.88em;
+}
+.ly-md__pre {
+  margin: 0.4em 0 0.7em;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.06);
+  overflow-x: auto;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+.ly-md__table-wrap { overflow-x: auto; margin: 0.4em 0 0.7em; }
+.ly-md table { border-collapse: collapse; font-size: 0.92em; }
+.ly-md th, .ly-md td { padding: 5px 9px; border: 1px solid rgba(0, 0, 0, 0.1); text-align: left; }
+.ly-md th { background: rgba(0, 0, 0, 0.035); font-weight: 600; }
+
+.ly-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  border-radius: 14px;
+  background: rgba(248, 250, 255, 0.97);
+  box-shadow: 0 10px 30px rgba(49, 46, 129, 0.12);
+  color: #1e1b4b;
+}
+.ly-confirm--high { border-color: rgba(234, 179, 8, 0.4); background: rgba(255, 251, 235, 0.97); color: #713f12; }
+.ly-confirm__head { display: flex; align-items: center; gap: 8px; }
+.ly-confirm__title { font-size: 13.5px; font-weight: 700; }
+.ly-confirm__detail { font-size: 12px; line-height: 1.5; opacity: 0.82; }
+.ly-confirm__actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.ly-confirm__timer { margin-right: auto; font-size: 11px; opacity: 0.6; }
+.ly-confirm__actions button {
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.85);
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ly-confirm__actions button:hover { background: #fff; }
+.ly-confirm__actions button:focus-visible { outline: 2px solid var(--accent, #6366f1); outline-offset: 1px; }
+.ly-confirm__actions .ly-confirm__primary {
+  border-color: transparent;
+  background: var(--accent, #6366f1);
+  color: #fff;
+  font-weight: 600;
+}
+.ly-confirm__actions .ly-confirm__primary:hover { filter: brightness(1.06); background: var(--accent, #6366f1); }
+.ly-confirm--compact { padding: 10px 12px; }
+.ly-confirm { position: relative; overflow: hidden; animation: ly-confirm-in 0.18s ease-out; }
+.ly-confirm__actions button:disabled { opacity: 0.55; cursor: default; }
+.ly-confirm--answered { opacity: 0.75; }
+.ly-confirm__countdown { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(99, 102, 241, 0.08); }
+.ly-confirm__countdown > div { height: 100%; background: var(--accent, #6366f1); opacity: 0.55; transition: width 1s linear; }
+.ly-confirm--high .ly-confirm__countdown > div { background: #d97706; }
+@keyframes ly-confirm-in { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .ly-confirm { animation: none; }
+  .ly-confirm__countdown > div { transition: none; }
+}
+
+.ly-receipts { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.ly-receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px 6px 4px 9px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.09);
+  color: #065f46;
+  font-size: 12px;
+}
+.ly-receipt__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ly-receipt__icon { flex-shrink: 0; }
+.ly-receipt--undone { background: rgba(100, 116, 139, 0.1); color: #475569; }
+.ly-receipt--error { background: rgba(239, 68, 68, 0.08); color: #991b1b; }
+.ly-receipt__undo {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.ly-receipt__undo:hover { background: #fff; }
+.ly-receipt__undo:disabled { opacity: 0.6; cursor: default; }
+.ly-receipt__error { font-size: 11px; opacity: 0.85; }
+.ly-receipt--expired { background: rgba(100, 116, 139, 0.08); color: #64748b; }
+.ly-receipts__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 3px 10px;
+  border: 1px dashed rgba(16, 185, 129, 0.45);
+  border-radius: 999px;
+  background: transparent;
+  color: #047857;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.ly-receipts__all:hover { background: rgba(16, 185, 129, 0.08); }
+.ly-receipts__all:disabled { opacity: 0.6; cursor: default; }
+
+.ly-attachments { display: flex; flex-wrap: wrap; gap: 5px; }
+.ly-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  padding: 3px 6px 3px 8px;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.08);
+  color: #3730a3;
+  font-size: 11.5px;
+}
+.ly-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ly-attachment button { display: inline-flex; padding: 1px; border: none; background: none; color: inherit; cursor: pointer; opacity: 0.7; }
+.ly-attachment button:hover { opacity: 1; }
+
+@keyframes ly-spin { to { transform: rotate(360deg); } }
+.ly-spin { animation: ly-spin 0.9s linear infinite; }

@@ -26,6 +26,16 @@ export function getUserWallpapersRoot(): string {
   return join(app.getPath('userData'), 'wallpapers')
 }
 
+/** Online-library downloads land here before they are validated and imported. */
+export function getWallpaperDownloadsRoot(): string {
+  return join(app.getPath('userData'), 'wallpaper-downloads')
+}
+
+/** Copies of files pasted or dropped into a chat (the app never learns their original path). */
+export function getChatDropsRoot(): string {
+  return join(app.getPath('userData'), 'chat-drops')
+}
+
 export function getRemoteWallpapersRoot(): string {
   return join(app.getPath('userData'), 'remote-wallpapers')
 }

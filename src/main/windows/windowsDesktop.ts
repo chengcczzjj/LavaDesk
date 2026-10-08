@@ -96,3 +96,28 @@ export function toggleWindowsDesktop(): boolean {
     return false
   }
 }
+
+/** Press and release one virtual key (media / volume keys) `times` times. */
+export function createVirtualKeyPressEvents(virtualKey: number, times = 1): KeyboardInputEvent[] {
+  const count = Math.max(1, Math.min(50, Math.round(times)))
+  const events: KeyboardInputEvent[] = []
+  for (let index = 0; index < count; index += 1) {
+    events.push(
+      { type: INPUT_KEYBOARD, u: { ki: { wVk: virtualKey, wScan: 0, dwFlags: 0, time: 0, dwExtraInfo: 0 } } },
+      { type: INPUT_KEYBOARD, u: { ki: { wVk: virtualKey, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
+    )
+  }
+  return events
+}
+
+export function pressVirtualKey(virtualKey: number, times = 1): boolean {
+  if (process.platform !== 'win32') return false
+  const sendInput = loadSendInputApi()
+  if (!sendInput || inputSize <= 0) return false
+  const events = createVirtualKeyPressEvents(virtualKey, times)
+  try {
+    return sendInput(events.length, events, inputSize) === events.length
+  } catch {
+    return false
+  }
+}

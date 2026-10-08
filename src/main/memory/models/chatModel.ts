@@ -26,6 +26,7 @@ function validateProfileApiKey(profile: ModelProfile): string | null {
 export interface ResolvedModelCapabilities {
   toolCalling: boolean
   reasoning: boolean
+  vision: boolean
   maxContextTokens: number
   maxOutputTokens: number
 }
@@ -37,6 +38,7 @@ export function getModelCapabilities(profile: Pick<ModelProfile, 'provider' | 'm
   return {
     toolCalling: configured.toolCalling !== 'disabled',
     reasoning: configured.reasoning ?? reasoningModel,
+    vision: configured.vision ?? (profile.provider === 'deepseek' ? false : detectVisionModel(profile.provider, profile.model)),
     maxContextTokens: Math.max(
       4_096,
       configured.maxContextTokens
@@ -47,6 +49,12 @@ export function getModelCapabilities(profile: Pick<ModelProfile, 'provider' | 'm
       configured.maxOutputTokens ?? (deepSeekV4 ? DEEPSEEK_MAX_OUTPUT_TOKENS : 16_384),
     ),
   }
+}
+
+/** Model families that accept images through the chat API; unknown names default to text-only. */
+export function detectVisionModel(provider: string, model: string): boolean {
+  if (provider === 'google') return !/embedding|aqa|tts/i.test(model)
+  return /gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-4-vision|gpt-5|chatgpt-4o|\bo[34](-mini)?\b|claude|gemini|vision|[-_.]vl\b|[-_.]vl[-_.]|qwen.*vl|qvq|glm-4v|glm-4\.[15]v|pixtral|llava|grok-(2-)?vision|grok-4|doubao.*(vision|seed-1\.6)|kimi.*(vision|vl)|moonshot.*vision|step-1v|internvl|minicpm-v|yi-vision/i.test(model)
 }
 
 export function supportsToolCalling(profile: Pick<ModelProfile, 'provider' | 'model' | 'capabilities'>): boolean {

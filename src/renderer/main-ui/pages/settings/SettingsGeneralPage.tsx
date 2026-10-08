@@ -16,9 +16,20 @@ import {
   RefreshCw,
   Download,
   RotateCcw,
+  Keyboard,
+  MoonStar,
+  ShieldCheck,
 } from 'lucide-react'
 import type { AppUpdateStatus, ModelProfile, ModelProvider } from '@shared/types'
 import { DEEPSEEK_API_BASE_URL, DEEPSEEK_LATEST_MODEL } from '@shared/model-defaults'
+import {
+  DEFAULT_QUICK_CHAT_SHORTCUT,
+  acceleratorFromKeyEvent,
+  describeActionGrant,
+  shortcutKeyLabels,
+  type CompanionSettings,
+  type CompanionSettingsSnapshot,
+} from '@shared/companion-settings'
 import './settings.css'
 
 const PROVIDER_LABELS: Record<ModelProvider, string> = {
@@ -50,6 +61,180 @@ function getIncompleteProfileReason(profile: ModelProfile): string {
   if (!profile.name.trim()) return '请填写配置名称'
   if (!profile.model.trim()) return '请填写或从列表选择模型'
   return ''
+}
+
+function ShortcutKeys({ accelerator }: { accelerator: string }) {
+  return (
+    <span className="shortcut-keys">
+      {shortcutKeyLabels(accelerator).map((label, index) => <kbd key={`${label}-${index}`}>{label}</kbd>)}
+    </span>
+  )
+}
+
+function CompanionSettingsGroup() {
+  const [settings, setSettings] = useState<CompanionSettingsSnapshot | null>(null)
+  const [recording, setRecording] = useState(false)
+  const [message, setMessage] = useState('')
+  const recorderRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    let alive = true
+    void window.lingyue.app.getCompanionSettings().then((next) => {
+      if (alive) setSettings(next)
+    })
+    return () => { alive = false }
+  }, [])
+
+  const save = async (patch: Partial<CompanionSettings>) => {
+    try {
+      const next = await window.lingyue.app.setCompanionSettings(patch)
+      setSettings(next)
+      setMessage(patch.quickChatShortcut !== undefined
+        ? next.quickChatShortcut && !next.shortcutActive ? '这个组合键被别的程序占用了，换一个试试。' : next.quickChatShortcut ? '热键已更新' : '已关闭热键'
+        : '已保存')
+    } catch (error) {
+      setMessage(formatIpcError(error, '保存失败'))
+    }
+  }
+
+  const revokeGrant = async (key: string) => {
+    try {
+      setSettings(await window.lingyue.app.revokeActionGrant(key))
+    } catch (error) {
+      setMessage(formatIpcError(error, '收回失败'))
+    }
+  }
+
+  const startRecording = () => {
+    setMessage('')
+    setRecording(true)
+    recorderRef.current?.focus()
+  }
+
+  const onRecorderKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!recording) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.key === 'Escape') {
+      setRecording(false)
+      return
+    }
+    const accelerator = acceleratorFromKeyEvent(event)
+    if (!accelerator) {
+      if (!['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) setMessage('需要同时按住 Ctrl、Alt 或 Win 中的至少一个。')
+      return
+    }
+    setRecording(false)
+    void save({ quickChatShortcut: accelerator })
+  }
+
+  if (!settings) return null
+  const quiet = settings.quietHours
+  return (
+    <div className="settings-group">
+      <div className="settings-group__header">伴侣与快捷对话</div>
+
+      <div className="settings-card">
+        <div className="settings-card__icon"><Keyboard size={18} /></div>
+        <div className="settings-card__body">
+          <div className="settings-card__title">快捷对话热键</div>
+          <div className="settings-card__desc">
+            在任何地方按下即可唤出桌面小对话框；点桌面上的桌宠或托盘菜单也能打开。点一下按键框，再直接按下想用的组合键即可更换。
+            {settings.quickChatShortcut && !settings.shortcutActive && ' 当前热键未生效（可能被别的程序占用）。'}
+          </div>
+          {message && <div className="settings-card__desc settings-card__desc--status">{message}</div>}
+        </div>
+        <div className="settings-card__action settings-card__action--row">
+          <button
+            ref={recorderRef}
+            type="button"
+            className={`shortcut-recorder ${recording ? 'shortcut-recorder--recording' : ''}`}
+            onClick={startRecording}
+            onKeyDown={onRecorderKeyDown}
+            onBlur={() => setRecording(false)}
+            aria-label="录制快捷对话热键"
+            title="点一下，然后直接按下想用的组合键"
+          >
+            {recording
+              ? <span className="shortcut-recorder__hint">按下组合键… Esc 取消</span>
+              : settings.quickChatShortcut ? <ShortcutKeys accelerator={settings.quickChatShortcut} /> : <span className="shortcut-recorder__hint">未设置</span>}
+          </button>
+          {settings.quickChatShortcut !== DEFAULT_QUICK_CHAT_SHORTCUT && (
+            <button className="settings-btn settings-btn--sm" onClick={() => void save({ quickChatShortcut: DEFAULT_QUICK_CHAT_SHORTCUT })}>恢复默认</button>
+          )}
+          {settings.quickChatShortcut && (
+            <button className="settings-btn settings-btn--sm" onClick={() => void save({ quickChatShortcut: '' })}>关闭</button>
+          )}
+          <button className="settings-btn settings-btn--sm" onClick={() => window.lingyue.app.toggleQuickChat()}>打开</button>
+        </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card__icon"><MoonStar size={18} /></div>
+        <div className="settings-card__body">
+          <div className="settings-card__title">安静时段</div>
+          <div className="settings-card__desc">这段时间里，天气早报、久坐提醒这类主动提醒不会打扰你；你亲口让她设的提醒仍会静音送达。</div>
+        </div>
+        <div className="settings-card__action settings-card__action--row">
+          <input
+            className="settings-input settings-input--time"
+            type="time"
+            value={quiet.start}
+            disabled={!quiet.enabled}
+            onChange={(event) => void save({ quietHours: { ...quiet, start: event.target.value } })}
+            aria-label="安静时段开始"
+          />
+          <span className="settings-card__sep">至</span>
+          <input
+            className="settings-input settings-input--time"
+            type="time"
+            value={quiet.end}
+            disabled={!quiet.enabled}
+            onChange={(event) => void save({ quietHours: { ...quiet, end: event.target.value } })}
+            aria-label="安静时段结束"
+          />
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={quiet.enabled}
+              onChange={(event) => void save({ quietHours: { ...quiet, enabled: event.target.checked } })}
+              aria-label="开启安静时段"
+            />
+            <div className="toggle-switch__track">
+              <div className="toggle-switch__thumb" />
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div className="settings-card settings-card--stack">
+        <div className="settings-card__icon"><ShieldCheck size={18} /></div>
+        <div className="settings-card__body">
+          <div className="settings-card__title">不再询问的操作</div>
+          <div className="settings-card__desc">
+            {settings.actionGrants.length === 0
+              ? '打开应用、截屏前她都会先问你。在确认卡上选“以后都直接做”后，会出现在这里，可以随时收回。'
+              : '这些操作她会直接做，不再弹确认卡。收回后下次会重新问你。'}
+          </div>
+          {settings.actionGrants.length > 0 && (
+            <div className="grant-chips">
+              {settings.actionGrants.map((key) => (
+                <span key={key} className="grant-chip">
+                  {describeActionGrant(key)}
+                  <button type="button" onClick={() => void revokeGrant(key)} aria-label={`收回：${describeActionGrant(key)}`} title="收回">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        {settings.actionGrants.length > 1 && (
+          <div className="settings-card__action">
+            <button className="settings-btn settings-btn--sm" onClick={() => void revokeGrant('*')}>全部收回</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function SettingsGeneralPage() {
@@ -508,6 +693,8 @@ export function SettingsGeneralPage() {
         </div>
       </div>
 
+      <CompanionSettingsGroup />
+
       {/* ════════ 隐私与定位 ════════ */}
       <div className="settings-group">
         <div className="settings-group__header">隐私与定位</div>
@@ -733,6 +920,30 @@ export function SettingsGeneralPage() {
                   </div>
                 )}
               </div>
+
+              {/* 图片理解 */}
+              {editingProfile.provider !== 'deepseek' && (
+                <div className="form-field form-field--full">
+                  <label className="form-field__label">图片理解</label>
+                  <select
+                    className="form-field__input"
+                    value={editingProfile.capabilities?.vision === undefined ? 'auto' : editingProfile.capabilities.vision ? 'on' : 'off'}
+                    onChange={(e) => {
+                      const { vision: _previous, ...rest } = editingProfile.capabilities ?? {}
+                      const value = e.target.value
+                      setEditingProfile({
+                        ...editingProfile,
+                        capabilities: value === 'auto' ? rest : { ...rest, vision: value === 'on' },
+                      })
+                    }}
+                  >
+                    <option value="auto">按模型名自动判断</option>
+                    <option value="on">支持看图</option>
+                    <option value="off">不支持看图</option>
+                  </select>
+                  <div className="form-field__hint">支持看图时，聊天里的图片附件和截图会直接交给模型；否则改用本地文字识别。</div>
+                </div>
+              )}
             </div>
 
             {/* Footer: 测试 + 保存 */}

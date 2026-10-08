@@ -169,6 +169,12 @@ export function WallpaperSidebar(props: {
               {Array.isArray(item.meta.Tags) && (
                 <InfoLine label="标签" value={(item.meta.Tags as string[]).join(' / ')} />
               )}
+              {item.meta.Source === 'flowwall' && (
+                <InfoLine
+                  label="来源"
+                  value={`FlowWall 在线壁纸${typeof item.meta.DownloadedAt === 'string' ? ` · ${new Date(item.meta.DownloadedAt).toLocaleDateString()} 下载` : ''}`}
+                />
+              )}
               <InfoLine label="ID" value={item.id} mono />
             </div>
           </div>

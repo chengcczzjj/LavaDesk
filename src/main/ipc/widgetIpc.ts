@@ -947,6 +947,24 @@ export function registerWidgetIpc(): void {
  * 组件标准尺寸（仿 macOS 桌面组件规范）
  * 基础单元 160px，间距 16px
  */
+/** Wallpaper namespace the in-memory widget list belongs to (widgets are stored per wallpaper). */
+export function getWidgetNamespaceWallpaperIdForTool(): string | null {
+  return (widgetNamespaceInitialized ? widgetWallpaperId : store.get('wallpaper')?.current?.id) ?? null
+}
+
+/**
+ * Replace the whole widget list for AI undo and saved desktop modes. It goes
+ * through the same persistence limits, canvas sync and per-wallpaper autosave
+ * as every other edit.
+ */
+export function replaceWidgetsForTool(widgets: WidgetInstance[]): WidgetInstance[] {
+  persistWidgets(withDefaultWidgetConfigs(cloneWidgets(widgets)))
+  syncToCanvas()
+  autoSaveToWallpaper()
+  if (!isCanvasEditMode()) setCanvasMousePassthrough(true)
+  return store.get('widgets')
+}
+
 export function listWidgetsForTool(): WidgetInstance[] {
   return withDefaultWidgetConfigs(parseStoredWidgets(store.get('widgets')))
 }

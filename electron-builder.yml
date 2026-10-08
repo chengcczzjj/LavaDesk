@@ -23,6 +23,10 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+protocols:
+  - name: LavaDesk
+    schemes:
+      - lingyue
 npmRebuild: false
 publish:
   - provider: github

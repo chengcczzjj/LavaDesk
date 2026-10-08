@@ -10,13 +10,23 @@ import { ModelConfig } from '../models/config'
 import { getModelCapabilities, streamChat } from '../models/chatModel'
 import { buildToolRouterPrompt, decideToolRoute, getToolSet, type ToolCallEvent } from '../tools'
 import { store } from '../../store'
+import { randomUUID } from 'crypto'
+import { promises as fs } from 'fs'
 import { DEFAULT_CHAT_PERSONA } from '@shared/persona'
 import { getToolManifest } from '@shared/tool-manifest'
+import { isDeclinedToolOutput, isFailedToolOutput, readActionReceipt } from '@shared/tool-result'
+import { imageMediaType } from '@shared/chat-attachments'
+import { petStateForTool } from '@shared/widget-command'
 import type { ChatTerminalStatus } from '@shared/agent-runtime'
 import type { ConversationMode } from '../events/types'
 import type { ConversationRecord } from '../conversations/conversationStore'
 import type { AgentApproval, AgentRunEvent, AgentRunStatus } from '@shared/types'
-import type { ToolSet } from 'ai'
+import type { ModelMessage } from 'ai'
+import { createManagedToolSet, shouldCacheToolCall, toolCacheKey, type ConfirmationRequester } from './toolExecution'
+import { buildDesktopSnapshotText } from '../desktop/desktopState'
+import { ActionJournal } from '../desktop/actionJournal'
+import { AttachmentStore } from '../desktop/attachmentStore'
+import { setPetAgentPhase } from '../desktop/petBridge'
 
 export interface SendMessageParams {
   conversationId?: string
@@ -25,6 +35,8 @@ export interface SendMessageParams {
   text: string
   internal?: boolean
   forceAgentRun?: boolean
+  /** Files the user attached to this message (ids from AttachmentStore.register). */
+  attachmentIds?: string[]
   abortSignal?: AbortSignal
 }
 
@@ -34,6 +46,8 @@ export interface ChatStreamCallbacks {
   onError: (error: string) => void
   onToolCall?: (event: ToolCallEvent) => void
   onRunEvent?: (event: AgentRunEvent) => void
+  /** Interactive surfaces answer confirmation cards; background runs leave this out. */
+  requestConfirmation?: ConfirmationRequester
 }
 
 function extractContextFiles(output: unknown): string[] {
@@ -89,132 +103,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
 }
 
-type ExecutableTool = { execute?: (...args: unknown[]) => unknown }
-
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value)
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
-  const record = value as Record<string, unknown>
-  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`
-}
-
-function normalizeToolCacheInput(toolName: string, input: unknown): unknown {
-  if (toolName === 'get_user_location') {
-    const record = asRecord(input)
-    const precision = typeof record?.precision === 'string' ? record.precision : 'auto'
-    return { refresh: record?.refresh === true, precision }
-  }
-  if (toolName === 'weather') {
-    const record = asRecord(input)
-    const city = typeof record?.city === 'string'
-      ? record.city.trim().replace(/市$/, '').toLowerCase()
-      : ''
-    const days = typeof record?.days === 'number' ? record.days : 3
-    return { city, days }
-  }
-  return input
-}
-
-function toolCacheKey(toolName: string, input: unknown): string {
-  return `${toolName}:${stableStringify(normalizeToolCacheInput(toolName, input))}`
-}
-
-function shouldCacheToolCall(toolName: string): boolean {
-  return getToolManifest(toolName)?.cacheable === true
-}
-
-function compactToolOutput(value: unknown, maxChars: number): unknown {
-  const budget = { remaining: maxChars, truncated: false }
-  const visit = (input: unknown, depth: number): unknown => {
-    if (budget.remaining <= 0) {
-      budget.truncated = true
-      return '[已按工具上下文预算截断]'
-    }
-    if (typeof input === 'string') {
-      if (input.length <= budget.remaining) {
-        budget.remaining -= input.length
-        return input
-      }
-      const result = `${input.slice(0, Math.max(0, budget.remaining - 18))}\n[内容已截断]`
-      budget.remaining = 0
-      budget.truncated = true
-      return result
-    }
-    if (input == null || typeof input === 'number' || typeof input === 'boolean') {
-      budget.remaining -= 8
-      return input
-    }
-    if (depth >= 8) {
-      budget.truncated = true
-      return '[嵌套内容已截断]'
-    }
-    if (Array.isArray(input)) {
-      const result: unknown[] = []
-      for (const item of input.slice(0, 100)) {
-        if (budget.remaining <= 0) break
-        result.push(visit(item, depth + 1))
-      }
-      if (result.length < input.length) {
-        budget.truncated = true
-        result.push({ truncatedItems: input.length - result.length })
-      }
-      return result
-    }
-    if (typeof input === 'object') {
-      const result: Record<string, unknown> = {}
-      const entries = Object.entries(input as Record<string, unknown>)
-      for (const [key, item] of entries.slice(0, 100)) {
-        if (budget.remaining <= 0) break
-        budget.remaining -= key.length
-        result[key] = visit(item, depth + 1)
-      }
-      if (Object.keys(result).length < entries.length) {
-        budget.truncated = true
-        result._truncatedFields = entries.length - Object.keys(result).length
-      }
-      return result
-    }
-    return String(input)
-  }
-  return visit(value, 0)
-}
-
-function createCachedToolSet(tools: ToolSet): ToolSet {
-  const cache = new Map<string, Promise<unknown>>()
-  const wrapped: Record<string, unknown> = {}
-
-  for (const [toolName, toolDef] of Object.entries(tools)) {
-    const executable = toolDef as ExecutableTool
-    if (typeof executable.execute !== 'function') {
-      wrapped[toolName] = toolDef
-      continue
-    }
-
-    const executeWithBudget = async (...args: unknown[]) => {
-      const output = await executable.execute!(...args)
-      const maxChars = toolName === 'read_file' || toolName === 'extract_pdf_text' || toolName === 'read_docx'
-        ? 60_000
-        : 24_000
-      return compactToolOutput(output, maxChars)
-    }
-
-    wrapped[toolName] = {
-      ...toolDef,
-      execute: (...args: unknown[]) => {
-        if (!shouldCacheToolCall(toolName)) return executeWithBudget(...args)
-        const key = toolCacheKey(toolName, args[0])
-        const existing = cache.get(key)
-        if (existing) return existing
-        const promise = executeWithBudget(...args)
-        cache.set(key, promise)
-        return promise
-      },
-    }
-  }
-
-  return wrapped as ToolSet
-}
-
 function booleanValue(record: Record<string, unknown> | null, key: string): boolean | null {
   const value = record?.[key]
   return typeof value === 'boolean' ? value : null
@@ -225,15 +113,6 @@ function stringValue(record: Record<string, unknown> | null, key: string): strin
   return typeof value === 'string' && value.trim() ? value : null
 }
 
-function isApprovalToolOutput(output: unknown): boolean {
-  return booleanValue(asRecord(output), 'approvalRequired') === true || Boolean(extractApproval(output))
-}
-
-function isFailedToolOutput(output: unknown, error?: unknown): boolean {
-  if (error) return true
-  const record = asRecord(output)
-  return booleanValue(record, 'ok') === false && !isApprovalToolOutput(output)
-}
 
 interface ToolFailureSummary {
   toolName: string
@@ -361,6 +240,8 @@ function getToolPlanHint(toolName: string): string {
 
 function summarizeCompletedTool(toolName: string, output: unknown): string {
   const record = asRecord(output)
+  const receipt = readActionReceipt(output)
+  if (receipt) return receipt.summary
   const path = stringValue(record, 'path')
   const formatted = stringValue(record, 'formatted')
   const abstract = stringValue(record, 'abstract')
@@ -375,6 +256,33 @@ function summarizeCompletedTool(toolName: string, output: unknown): string {
   return `${toolName}: 已完成`
 }
 
+const MAX_INLINE_IMAGES = 4
+
+/**
+ * Vision-capable models see the images the user attached to this message
+ * directly; other attachments stay listed as text for read_attachment.
+ */
+async function attachImagesToLatestUserMessage(messages: ModelMessage[], attachments: ReturnType<typeof AttachmentStore.bind>): Promise<void> {
+  const images = attachments.filter((item) => item.kind === 'image').slice(0, MAX_INLINE_IMAGES)
+  if (images.length === 0) return
+  const index = messages.map((message) => message.role).lastIndexOf('user')
+  const message = messages[index]
+  if (!message || typeof message.content !== 'string') return
+  const parts: Array<{ type: 'text'; text: string } | { type: 'image'; image: Buffer; mediaType: string }> = [
+    { type: 'text', text: message.content },
+  ]
+  for (const image of images) {
+    const grant = AttachmentStore.get(image.id)
+    if (!grant) continue
+    try {
+      parts.push({ type: 'image', image: await fs.readFile(grant.path), mediaType: imageMediaType(grant.name) })
+    } catch {
+      // Unreadable file: the text list still names it and read_attachment reports the error.
+    }
+  }
+  if (parts.length > 1) messages[index] = { role: 'user', content: parts }
+}
+
 export const ChatService = {
   /** 发送消息并流式返回回复（支持 tool calling 多步推理） */
   async sendMessage(params: SendMessageParams, callbacks: ChatStreamCallbacks): Promise<ChatSendResult> {
@@ -382,6 +290,8 @@ export const ChatService = {
 
     // 1. 获取/创建会话
     const conv = ConversationStore.getOrCreate(params.conversationId, mode, params.projectId)
+    const turnId = randomUUID()
+    const attachments = params.attachmentIds?.length ? AttachmentStore.bind(params.attachmentIds, conv.id) : []
     const workspaceId = conv.projectId ?? params.projectId ?? null
     const workspace = workspaceId ? ProjectStore.get(workspaceId) : undefined
     const toolContext = { workspaceId, runId: undefined as string | undefined, threadId: conv.id }
@@ -447,8 +357,11 @@ export const ChatService = {
       conversationId: conv.id,
       eventType: params.internal ? 'system_event' : 'user_message',
       mode: conv.mode as ConversationMode,
-      content: params.internal ? { type: 'internal_instruction', text } : { text },
+      content: params.internal
+        ? { type: 'internal_instruction', text }
+        : { text, ...(attachments.length > 0 ? { attachments } : {}) },
     })
+    setPetAgentPhase('thinking')
 
     // 4. 获取最近消息构建上下文
     const recent = EventStore.listRecent(conv.id, 30)
@@ -459,7 +372,12 @@ export const ChatService = {
       .filter((event) => event.eventType === 'tool_call')
       .map((event) => (event.content as { toolName?: unknown } | undefined)?.toolName)
       .filter((name): name is string => typeof name === 'string')
-    const toolRoute = decideToolRoute({ text, workspace, recentToolNames })
+    const toolRoute = decideToolRoute({
+      text,
+      workspace,
+      recentToolNames,
+      hasAttachments: AttachmentStore.listForConversation(conv.id).length > 0,
+    })
 
     // 5. 获取 model profile
     const profile = ModelConfig.getActive()
@@ -472,6 +390,7 @@ export const ChatService = {
         content: { text: message },
       })
       ConversationStore.touch(conv.id)
+      setPetAgentPhase(null)
       emitRunStatus('failed', '未配置模型。请在设置中添加模型 Profile。')
       callbacks.onDone(message, conv.id)
       return {
@@ -484,7 +403,7 @@ export const ChatService = {
     }
 
     const modelCapabilities = getModelCapabilities(profile)
-    const { system, messages } = buildInitialContext({
+    const { system, dynamicSystem, messages } = buildInitialContext({
       scene,
       recentEvents: recent,
       persona: getSavedPersonaPrompt(),
@@ -492,12 +411,14 @@ export const ChatService = {
       maxContextTokens: Math.max(4096, modelCapabilities.maxContextTokens - modelCapabilities.maxOutputTokens),
     })
     if (params.internal) messages.push({ role: 'user', content: text })
+    else if (modelCapabilities.vision) await attachImagesToLatestUserMessage(messages, attachments)
     const effectiveToolRoute = modelCapabilities.toolCalling
       ? toolRoute
       : {
           ...toolRoute,
           toolNames: [],
           usesWidgets: false,
+          usesAttachments: false,
           usesDesktopScene: false,
           usesWorkspaceRead: false,
           usesWorkspaceWrite: false,
@@ -508,11 +429,22 @@ export const ChatService = {
     const capabilitySystem = modelCapabilities.toolCalling
       ? ''
       : '\n\n【当前模型能力限制】当前模型配置已禁用工具调用。不要声称读取了实时信息、修改了文件或操作了桌面；如任务依赖工具，请明确建议用户切换支持工具的模型。'
-    const workspaceSystem = `${system}\n\n${toolRouterSystem}${capabilitySystem}`
+    // Stable prefix (persona, tool guidance) first; per-turn facts last so provider prompt caches keep hitting.
+    const journalDigest = ActionJournal.digest(conv.id)
+    const turnSystem = [
+      dynamicSystem,
+      modelCapabilities.toolCalling ? `【桌面现状】\n${buildDesktopSnapshotText()}` : '',
+      journalDigest ? `【最近的桌面操作】\n${journalDigest}` : '',
+    ].filter(Boolean).join('\n\n')
+    const workspaceSystem = [system, `${toolRouterSystem}${capabilitySystem}`.trim(), turnSystem].filter(Boolean).join('\n\n')
 
     // 6. 获取工具集
     const rawTools = getToolSet(toolContext, effectiveToolRoute.toolNames)
-    const tools = createCachedToolSet(rawTools)
+    const tools = createManagedToolSet(rawTools, {
+      conversationId: conv.id,
+      turnId,
+      requestConfirmation: callbacks.requestConfirmation,
+    })
     const visibleToolOffsets = new Map<string, number>()
     const hiddenDuplicateToolCallIds = new Set<string>()
 
@@ -540,6 +472,7 @@ export const ChatService = {
               }
               visibleToolOffsets.set(key, full.length)
             }
+            setPetAgentPhase(petStateForTool(toolName))
             if (!run && shouldAttachAgentRunForTool(toolName)) {
               ensureAgentRun('executing', getToolPlanHint(toolName))
             }
@@ -588,7 +521,7 @@ export const ChatService = {
             const failedTool = isFailedToolOutput(output, error)
             if (isSuccessfulDelivery(toolName, output)) {
               successfulDeliveries.push(summarizeSuccessfulDelivery(toolName, output))
-            } else if (!failedTool && !approval) {
+            } else if (!failedTool && !approval && !isDeclinedToolOutput(output)) {
               completedToolSummaries.push(summarizeCompletedTool(toolName, output))
             }
             if (failedTool) {
@@ -684,7 +617,7 @@ export const ChatService = {
           : successfulDeliveries.length > 0
               ? ['已完成本轮任务。', ...successfulDeliveries.slice(0, 3).map((item) => `- ${item}`)].join('\n')
               : completedToolSummaries.length > 0
-                ? ['工具已执行完成，但模型没有继续生成总结。', ...completedToolSummaries.slice(0, 3).map((item) => `- ${item}`)].join('\n')
+                ? ['搞定了：', ...completedToolSummaries.slice(0, 4).map((item) => `- ${item}`)].join('\n')
                 : full)
 
       if (!assistantText.trim()) {
@@ -712,6 +645,7 @@ export const ChatService = {
         ConversationStore.updateTitle(conv.id, title)
       }
 
+      setPetAgentPhase(failedSummary.length > 0 ? 'confused' : null, 5000)
       emitRunStatus(
         hasPendingApproval ? 'waiting-approval' : failedSummary.length > 0 ? 'failed' : 'completed',
         hasPendingApproval ? '等待用户确认后继续' : assistantText.slice(0, 200),
@@ -726,6 +660,7 @@ export const ChatService = {
       }
     } catch (e) {
       if (params.abortSignal?.aborted || isAbortError(e)) {
+        setPetAgentPhase(null)
         const partial = full.trim()
         const message = partial || '已停止运行。已完成的步骤会保留在任务记录里。'
         EventStore.append({
@@ -744,6 +679,7 @@ export const ChatService = {
           text: message,
         }
       }
+      setPetAgentPhase('error', 5000)
       const fallback = full.trim() || buildToolFailureReply(toolFailures)
       EventStore.append({
         conversationId: conv.id,
@@ -769,6 +705,11 @@ export const ChatService = {
   /** 创建新会话 */
   createConversation(mode: ConversationMode = 'daily'): ConversationRecord {
     return ConversationStore.create(mode)
+  },
+
+  /** Reuse a conversation when it still exists (quick chat keeps one running thread). */
+  getOrCreateConversation(id?: string): ConversationRecord {
+    return ConversationStore.getOrCreate(id, 'daily')
   },
 
   /** 列出所有会话 */

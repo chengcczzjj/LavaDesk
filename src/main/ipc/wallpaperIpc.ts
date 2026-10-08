@@ -114,6 +114,7 @@ function mapType(type: unknown, fileName?: string): WallpaperItem['type'] {
 }
 
 interface FlowWallDeskInfo {
+  [key: string]: unknown
   Title?: string
   Desc?: string
   Author?: string
@@ -476,6 +477,73 @@ export async function getWallpaperDisplaySettings(): Promise<WallpaperDisplaySet
   }
 }
 
+async function applyWallpaperItem(item: WallpaperItem, target: WallpaperApplyTarget): Promise<void> {
+  const state = store.get('wallpaper')
+  const settings = store.get('wallpaperDisplay')
+  const plan = planWallpaperApplication({ target, mode: settings.mode, assignments: settings.assignments,
+    displays: getDisplayDescriptors(), currentId: state.current?.id, itemId: item.id })
+  await commitWallpaperDisplay({ ...settings, mode: plan.mode, assignments: plan.assignments },
+    plan.currentId === item.id ? item : state.current ?? item)
+  // No z-order refresh here: it briefly lifts the canvas to always-on-top,
+  // which flashed every widget above the user's apps. New wallpaper windows
+  // re-sync the canvas when they attach (WALLPAPER_READY).
+  resetWallpaperFrameWatchdog()
+  if (wallpaperFrameDemanded) startMainCapture()
+}
+
+// ─── AI companion helpers: same queue, validation and usage locks as the UI ───
+
+export function listWallpapersForTool(): Promise<WallpaperItem[]> {
+  return listAllWallpapers()
+}
+
+export function getWallpaperStateForTool(): { current?: WallpaperItem; mode: WallpaperDisplayMode; assignments: Record<string, string> } {
+  const settings = store.get('wallpaperDisplay')
+  return {
+    current: store.get('wallpaper')?.current,
+    mode: normalizeWallpaperDisplayMode(settings?.mode),
+    assignments: { ...(settings?.assignments ?? {}) },
+  }
+}
+
+export async function applyWallpaperForTool(wallpaperId: string, target: WallpaperApplyTarget = 'current'): Promise<{ ok: boolean; item?: WallpaperItem; error?: string }> {
+  return withWallpaperChange(async () => {
+    const item = (await listAllWallpapers()).find((entry) => entry.id === wallpaperId)
+    if (!item) return { ok: false, error: 'wallpaper-not-found' }
+    await applyWallpaperItem(item, target)
+    return { ok: true, item: store.get('wallpaper')?.current?.id === item.id ? store.get('wallpaper').current : item }
+  })
+}
+
+/** Put back an earlier wallpaper + display layout (AI undo). */
+export async function restoreWallpaperLayoutForTool(layout: { wallpaperId: string | null; displayMode: WallpaperDisplayMode; assignments: Record<string, string> }): Promise<{ ok: boolean; error?: string }> {
+  return withWallpaperChange(async () => {
+    const catalog = await listAllWallpapers()
+    const item = layout.wallpaperId ? catalog.find((entry) => entry.id === layout.wallpaperId) : undefined
+    if (layout.wallpaperId && !item) return { ok: false, error: '原来的壁纸已经不在了，没法切回去。' }
+    const assignments = Object.fromEntries(Object.entries(layout.assignments).filter(([, id]) => catalog.some((entry) => entry.id === id)))
+    await commitWallpaperDisplay({ ...store.get('wallpaperDisplay'), mode: layout.displayMode, assignments, userConfigured: true }, item)
+    resetWallpaperFrameWatchdog()
+    if (wallpaperFrameDemanded) startMainCapture()
+    return { ok: true }
+  })
+}
+
+export async function updateWallpaperSettingsForTool(wallpaperId: string, settings: WallpaperSettings): Promise<{ ok: boolean; error?: string }> {
+  const patch = Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined)) as WallpaperSettings
+  const parsed = wallpaperSettingsSchema.safeParse(patch)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((issue) => issue.message).join('; ') }
+  await queueWallpaperSettings(wallpaperId, parsed.data)
+  return { ok: true }
+}
+
+export async function setWallpaperDisplayModeForTool(mode: WallpaperDisplayMode): Promise<WallpaperDisplaySettings> {
+  return withWallpaperChange(async () => {
+    await commitWallpaperDisplay({ ...store.get('wallpaperDisplay'), mode, schemaVersion: WALLPAPER_DISPLAY_SCHEMA_VERSION, userConfigured: true })
+    return getWallpaperDisplaySettings()
+  })
+}
+
 async function broadcastWallpaperDisplayLayout(snapshot?: WallpaperItem[]): Promise<void> {
   const catalog = snapshot ?? await listAllWallpapers()
   for (const win of getWallpaperWindows()) {
@@ -686,17 +754,7 @@ export function registerWallpaperIpc(): void {
     assertTrustedIpcSender(_e, ['main'])
     if (target !== 'current' && target !== 'all' && !Number.isInteger(target)) throw new Error('无效的壁纸显示目标')
     return withWallpaperChange(async () => {
-      const state = store.get('wallpaper')
-      const settings = store.get('wallpaperDisplay')
-      const plan = planWallpaperApplication({ target, mode: settings.mode, assignments: settings.assignments,
-        displays: getDisplayDescriptors(), currentId: state.current?.id, itemId: item.id })
-      await commitWallpaperDisplay({ ...settings, mode: plan.mode, assignments: plan.assignments },
-        plan.currentId === item.id ? item : state.current ?? item)
-      // No z-order refresh here: it briefly lifts the canvas to always-on-top,
-      // which flashed every widget above the user's apps. New wallpaper windows
-      // re-sync the canvas when they attach (WALLPAPER_READY).
-      resetWallpaperFrameWatchdog()
-      if (wallpaperFrameDemanded) startMainCapture()
+      await applyWallpaperItem(item, target)
       return true
     })
   })
@@ -796,108 +854,127 @@ export function registerWallpaperIpc(): void {
       meta: { name: string; desc: string; author: string; contact: string }
     ): Promise<{ ok: boolean; item?: WallpaperItem; error?: string }> => {
       assertTrustedIpcSender(_e, ['main'])
-      let createdFolder: string | undefined
-      try {
-        const ext = extname(filePath).toLowerCase()
-        const isZip = ext === '.zip'
-        const isHtml = ext === '.html' || ext === '.htm'
-        if (!VIDEO_EXT.has(ext) && !IMAGE_EXT.has(ext) && !isHtml && !isZip) throw new Error('不支持的壁纸文件格式')
-        const type: WallpaperItem['type'] = VIDEO_EXT.has(ext)
-          ? 'video'
-          : isHtml || isZip
-            ? 'web'
-            : 'image'
-
-        // 用壁纸名字做用户数据目录下的文件夹名
-        const displayName = meta.name.trim() || basename(filePath, ext)
-        const safeName = sanitizeUserDataSegment(displayName, 'wallpaper')
-        const root = getUserWallpapersRoot()
-        let folderName = safeName
-        let folder = join(root, folderName)
-
-        // 避免重名
-        let counter = 1
-        while (true) {
-          try {
-            await fs.access(folder)
-            folderName = `${safeName}_${counter++}`
-            folder = join(root, folderName)
-          } catch {
-            break
-          }
-        }
-
-        await fs.mkdir(folder, { recursive: true })
-        createdFolder = folder
-
-        let mainFileName: string
-
-        if (isZip) {
-          // ZIP 解压到目标文件夹
-          await extractZip(filePath, folder)
-          // 在解压后的文件中查找 index.html 或第一个 .html
-          const entry = await findHtmlEntry(folder)
-          if (!entry) throw new Error('ZIP 中没有找到 HTML 入口，请提供包含 index.html 的壁纸包。')
-          mainFileName = entry
-        } else {
-          // 视频/图片：单文件复制
-          mainFileName = basename(filePath)
-          const destFile = join(folder, mainFileName)
-          await fs.copyFile(filePath, destFile)
-        }
-
-        // 创建 FlowWallDeskInfo.json
-        const typeNum = type === 'web' ? 1 : type === 'video' ? 7 : 11
-        const info: FlowWallDeskInfo = {
-          Title: displayName,
-          Desc: meta.desc || '',
-          Author: meta.author || '',
-          Contact: meta.contact || '',
-          Type: typeNum,
-          FileName: mainFileName,
-          Tags: [type],
-          Id: folderName,
-        }
-
-        // 如果是图片类型，源文件本身就是预览
-        if (type === 'image') {
-          info.Thumbnail = mainFileName
-          info.Preview = mainFileName
-        }
-
-        await fs.writeFile(
-          join(folder, 'FlowWallDeskInfo.json'),
-          JSON.stringify(info, null, 2),
-          'utf-8'
-        )
-
-        const destSource = join(folder, mainFileName)
-
-        // 如果是视频，生成 GIF 预览
-        let preview: string | undefined
-        if (type === 'video') {
-          preview = await generateVideoPreviewGif(destSource, folder)
-        } else if (type === 'image') {
-          preview = destSource
-        }
-
-        const item: WallpaperItem = {
-          id: toUserWallpaperId(folderName),
-          name: displayName,
-          source: destSource,
-          type,
-          preview,
-          meta: info as unknown as Record<string, unknown>,
-        }
-
-        return { ok: true, item }
-      } catch (err) {
-        if (createdFolder) await fs.rm(createdFolder, { recursive: true, force: true }).catch(() => undefined)
-        console.error('[wallpaper] 导入失败:', err)
-        return { ok: false, error: String(err) }
-      }
+      // Source metadata such as "flowwall" is only set by the main process, never by the renderer.
+      return importWallpaperFile(filePath, { name: meta.name, desc: meta.desc, author: meta.author, contact: meta.contact })
     }
   )
+}
+
+export interface WallpaperImportMeta {
+  name: string
+  desc: string
+  author: string
+  contact: string
+  /** Extra FlowWallDeskInfo fields, e.g. where an online download came from. */
+  extra?: Record<string, unknown>
+}
+
+/**
+ * Copy a video / image / HTML / ZIP into the user wallpaper library with its
+ * FlowWallDeskInfo.json. Shared by manual import and online-library downloads.
+ */
+export async function importWallpaperFile(filePath: string, meta: WallpaperImportMeta): Promise<{ ok: boolean; item?: WallpaperItem; error?: string }> {
+  let createdFolder: string | undefined
+  try {
+    const ext = extname(filePath).toLowerCase()
+    const isZip = ext === '.zip'
+    const isHtml = ext === '.html' || ext === '.htm'
+    if (!VIDEO_EXT.has(ext) && !IMAGE_EXT.has(ext) && !isHtml && !isZip) throw new Error('不支持的壁纸文件格式')
+    const type: WallpaperItem['type'] = VIDEO_EXT.has(ext)
+      ? 'video'
+      : isHtml || isZip
+        ? 'web'
+        : 'image'
+
+    // 用壁纸名字做用户数据目录下的文件夹名
+    const displayName = meta.name.trim() || basename(filePath, ext)
+    const safeName = sanitizeUserDataSegment(displayName, 'wallpaper')
+    const root = getUserWallpapersRoot()
+    let folderName = safeName
+    let folder = join(root, folderName)
+
+    // 避免重名
+    let counter = 1
+    while (true) {
+      try {
+        await fs.access(folder)
+        folderName = `${safeName}_${counter++}`
+        folder = join(root, folderName)
+      } catch {
+        break
+      }
+    }
+
+    await fs.mkdir(folder, { recursive: true })
+    createdFolder = folder
+
+    let mainFileName: string
+
+    if (isZip) {
+      // ZIP 解压到目标文件夹
+      await extractZip(filePath, folder)
+      // 在解压后的文件中查找 index.html 或第一个 .html
+      const entry = await findHtmlEntry(folder)
+      if (!entry) throw new Error('ZIP 中没有找到 HTML 入口，请提供包含 index.html 的壁纸包。')
+      mainFileName = entry
+    } else {
+      // 视频/图片：单文件复制
+      mainFileName = basename(filePath)
+      const destFile = join(folder, mainFileName)
+      await fs.copyFile(filePath, destFile)
+    }
+
+    // 创建 FlowWallDeskInfo.json
+    const typeNum = type === 'web' ? 1 : type === 'video' ? 7 : 11
+    const info: FlowWallDeskInfo = {
+      ...(meta.extra ?? {}),
+      Title: displayName,
+      Desc: meta.desc || '',
+      Author: meta.author || '',
+      Contact: meta.contact || '',
+      Type: typeNum,
+      FileName: mainFileName,
+      Tags: [type],
+      Id: folderName,
+    }
+
+    // 如果是图片类型，源文件本身就是预览
+    if (type === 'image') {
+      info.Thumbnail = mainFileName
+      info.Preview = mainFileName
+    }
+
+    await fs.writeFile(
+      join(folder, 'FlowWallDeskInfo.json'),
+      JSON.stringify(info, null, 2),
+      'utf-8'
+    )
+
+    const destSource = join(folder, mainFileName)
+
+    // 如果是视频，生成 GIF 预览
+    let preview: string | undefined
+    if (type === 'video') {
+      preview = await generateVideoPreviewGif(destSource, folder)
+    } else if (type === 'image') {
+      preview = destSource
+    }
+
+    const item: WallpaperItem = {
+      id: toUserWallpaperId(folderName),
+      name: displayName,
+      source: destSource,
+      type,
+      preview,
+      meta: info as unknown as Record<string, unknown>,
+    }
+
+    return { ok: true, item }
+  } catch (err) {
+    if (createdFolder) await fs.rm(createdFolder, { recursive: true, force: true }).catch(() => undefined)
+    console.error('[wallpaper] 导入失败:', err)
+    return { ok: false, error: String(err) }
+  }
 }
 
 /**

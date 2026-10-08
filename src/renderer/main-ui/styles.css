@@ -3224,3 +3224,302 @@ textarea,
   cursor: pointer;
 }
 .lavanotes-panel__footnote { margin: 0; color: var(--text-secondary); font-size: 12px; }
+
+/* ===== FlowWall 在线壁纸站 ===== */
+.flowwall-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-solid);
+}
+.flowwall-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 46px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border-divider);
+  background: var(--bg-acrylic);
+}
+.flowwall-toolbar .nav-btn {
+  width: 32px;
+  height: 32px;
+}
+.flowwall-toolbar .nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
+}
+.flowwall-toolbar .nav-btn:focus-visible,
+.flowwall-toolbar__btn:focus-visible,
+.flowwall-link-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.flowwall-address {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  margin: 0 8px;
+  padding: 0 12px;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.flowwall-address__host {
+  color: var(--text-primary);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.flowwall-address__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btn.flowwall-toolbar__btn {
+  flex: 0 0 auto;
+  height: 30px;
+  margin-left: 4px;
+  padding: 0 10px;
+  font-size: 12px;
+  position: relative;
+}
+.btn.flowwall-toolbar__btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.flowwall-badge {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+.flowwall-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.flowwall-viewport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+}
+.flowwall-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.flowwall-state__title {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+.flowwall-state__text {
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.flowwall-state__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.flowwall-state__actions .btn {
+  flex: 0 0 auto;
+  padding: 0 14px;
+}
+.flowwall-downloads {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-divider);
+  background: var(--bg-acrylic);
+}
+.flowwall-downloads__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 6px 0 14px;
+  border-bottom: 1px solid var(--border-divider);
+  font-size: 13px;
+  font-weight: 700;
+}
+.flowwall-downloads__header > span {
+  flex: 1;
+}
+.flowwall-downloads__header .nav-btn {
+  width: 28px;
+  height: 28px;
+}
+.flowwall-downloads__notice {
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.flowwall-downloads__empty {
+  padding: 28px 22px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.7;
+  text-align: center;
+}
+.flowwall-downloads__empty p {
+  margin: 10px 0 0;
+}
+.flowwall-downloads__hint {
+  color: var(--text-tertiary);
+  font-size: 11.5px;
+}
+.flowwall-downloads__list {
+  flex: 1;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  overflow-y: auto;
+}
+.flowwall-download {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+}
+.flowwall-download + .flowwall-download {
+  margin-top: 4px;
+}
+.flowwall-download:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+.flowwall-download__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+.flowwall-download--failed .flowwall-download__icon,
+.flowwall-download--cancelled .flowwall-download__icon {
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--text-tertiary);
+}
+.flowwall-download__body {
+  flex: 1;
+  min-width: 0;
+}
+.flowwall-download__title {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flowwall-download__status {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.flowwall-download--failed .flowwall-download__status {
+  color: #b91c1c;
+}
+.flowwall-download--completed .flowwall-download__status,
+.flowwall-download--duplicate .flowwall-download__status {
+  color: #047857;
+}
+.flowwall-download__bar {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.07);
+  overflow: hidden;
+}
+.flowwall-download__bar > div {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+.flowwall-download__bar > div.indeterminate {
+  animation: flowwall-pulse 1.1s ease-in-out infinite;
+}
+@keyframes flowwall-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.flowwall-download__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.flowwall-download__actions:empty {
+  display: none;
+}
+.btn.btn--sm {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.flowwall-link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+.flowwall-link-btn:hover {
+  text-decoration: underline;
+}
+.wallpaper-card__source {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(6px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .flowwall-download__bar > div,
+  .flowwall-download__bar > div.indeterminate {
+    transition: none;
+    animation: none;
+  }
+}

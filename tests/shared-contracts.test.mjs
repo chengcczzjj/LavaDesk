@@ -110,6 +110,7 @@ test('tool manifest is unique and owns generated-widget routing metadata', () =>
       tracksAgentRun: false,
       label: '生成桌面组件',
       compactLabel: '组件',
+      journal: true,
     },
   )
 })
@@ -223,7 +224,11 @@ test('native canvas hit testing follows visual z-order and keeps widgets alive w
   assert.equal(isPassiveWidgetType('clock'), true)
   assert.equal(isPassiveWidgetType('graphicdatetime'), true)
   assert.equal(isPassiveWidgetType('weather'), true)
-  assert.equal(isPassiveWidgetType('quicktools'), true)
+  assert.equal(isPassiveWidgetType('sysmonitor'), true)
+  // Clickable widgets must capture the mouse, or Windows sends the click to the desktop.
+  assert.equal(isPassiveWidgetType('quicktools'), false)
+  assert.equal(isPassiveWidgetType('pet'), false)
+  assert.equal(isCanvasInteractiveWidgetType('pet'), true)
   assert.equal(isCanvasInteractiveWidgetType('clock'), false)
   assert.equal(isCanvasInteractiveWidgetType('generated-widget'), true)
   assert.equal(findInteractiveWidgetAtPoint({ x: 180, y: 150 }, display, [{

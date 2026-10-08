@@ -15,6 +15,8 @@ const markers = {
   'wallpaper-sandbox': 'SANDBOX_SMOKE_PASS ',
   'wallpaper-renderer': 'RENDERER_SMOKE_PASS ',
   'library-toolbar': 'LIBRARY_TOOLBAR_SMOKE_PASS ',
+  'quick-chat': 'QUICK_CHAT_SMOKE_PASS ',
+  flowwall: 'FLOWWALL_SMOKE_PASS ',
 }
 for (const [name, marker] of Object.entries(markers)) {
   let output = ''

@@ -1,6 +1,7 @@
 import { app, Menu, Tray, nativeImage } from 'electron'
 import { join } from 'path'
 import { createMainWindow, getMainWindow } from './windows/mainWindow'
+import { showQuickChat } from './windows/quickChatWindow'
 
 let tray: Tray | null = null
 let updateEntry: TrayUpdateEntry | null = null
@@ -25,6 +26,7 @@ function buildTrayMenu(): Menu {
         }
       },
     },
+    { label: '快捷对话', click: () => showQuickChat() },
     ...(updateEntry
       ? [
           { type: 'separator' as const },

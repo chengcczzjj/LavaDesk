@@ -14,14 +14,14 @@ export const openUrlTool = tool({
   execute: async ({ url }) => {
     // 安全检查：只允许 http/https 协议
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      return { success: false, error: '仅支持 http:// 或 https:// 协议的链接' }
+      return { ok: false, error: '仅支持 http:// 或 https:// 协议的链接' }
     }
 
     try {
       await shell.openExternal(url)
-      return { success: true, url }
+      return { ok: true, url }
     } catch (e) {
-      return { success: false, url, error: (e as Error).message }
+      return { ok: false, url, error: (e as Error).message }
     }
   },
 })

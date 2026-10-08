@@ -39,6 +39,9 @@ const DESKTOP_ICON_WIDGET_TYPES = new Set([
 // These widgets only paint changing information. They belong to the settled
 // desktop layer and should not make the transparent canvas capture the mouse
 // or trigger a temporary always-on-top repair during app/window switches.
+// A widget that gains a click action (the pet opens quick chat, quick tools
+// run real actions) must leave this list, or Windows routes its clicks to the
+// desktop behind it.
 const PASSIVE_WIDGET_TYPES = new Set([
   'clock',
   'elegantclock',
@@ -50,8 +53,6 @@ const PASSIVE_WIDGET_TYPES = new Set([
   'stocks',
   'news',
   'calendar',
-  'quicktools',
-  'pet',
   'sysmonitor',
 ])
 

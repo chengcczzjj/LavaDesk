@@ -51,6 +51,7 @@ export default defineConfig({
           'main-ui': resolve(__dirname, 'src/renderer/main-ui/index.html'),
           wallpaper: resolve(__dirname, 'src/renderer/wallpaper/index.html'),
           canvas: resolve(__dirname, 'src/renderer/canvas/index.html'),
+          'quick-chat': resolve(__dirname, 'src/renderer/quick-chat/index.html'),
         },
       },
     },

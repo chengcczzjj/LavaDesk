@@ -30,7 +30,7 @@ export const writeClipboardTool = tool({
   execute: async ({ text }) => {
     clipboard.writeText(text)
     return {
-      success: true,
+      ok: true,
       length: text.length,
       preview: text.length > 100 ? text.slice(0, 100) + '…' : text,
     }

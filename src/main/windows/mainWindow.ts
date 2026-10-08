@@ -15,6 +15,8 @@ let hasShownMainWindow = false
 export interface MainWindowNavTarget {
   activity: string
   subPage?: string
+  /** Chat conversation to open (quick chat → "在主界面继续"). */
+  conversationId?: string
 }
 
 export function createMainWindow(target?: MainWindowNavTarget): BrowserWindow {
@@ -87,6 +89,7 @@ export function createMainWindow(target?: MainWindowNavTarget): BrowserWindow {
     if (shouldRestore) params.set('restore', '1')
     if (target?.activity) params.set('activity', target.activity)
     if (target?.subPage) params.set('subPage', target.subPage)
+    if (target?.conversationId) params.set('conversation', target.conversationId)
     const q = params.toString() ? `?${params.toString()}` : ''
     mainWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}/main-ui/index.html${q}`)
   } else {
@@ -94,6 +97,7 @@ export function createMainWindow(target?: MainWindowNavTarget): BrowserWindow {
     if (shouldRestore) query.restore = '1'
     if (target?.activity) query.activity = target.activity
     if (target?.subPage) query.subPage = target.subPage
+    if (target?.conversationId) query.conversation = target.conversationId
     mainWindow.loadFile(join(__dirname, '../renderer/main-ui/index.html'), {
       query: Object.keys(query).length > 0 ? query : undefined,
     })

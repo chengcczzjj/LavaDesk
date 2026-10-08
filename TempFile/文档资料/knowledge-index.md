@@ -24,10 +24,13 @@
 | --- | --- |
 | 双屏、壁纸错位、DPI、热插拔 | [多显示器方案](../../doc/双显示器支持方案.md) + 经验 L03 + display-layout 相关源码/测试 |
 | Dock、鼠标穿透、锁屏/全屏恢复 | 经验 L04-L06、L08 + canvas / widget 相关源码/测试 |
-| 便签（LavaNotes 检测与唤起） | 经验 L06、L15 + lavanotes-service / LavaNotesPanel；便签本身在 [LavaNotes 仓库](https://github.com/chengcczzjj/LavaNotes) |
-| 改名、数据目录、旧数据迁移 | 经验 L15 + legacyUserDataCore / legacy-migration 测试 |
+| 便签（LavaNotes 检测与唤起） | 经验 L06、L18 + lavanotes-service / LavaNotesPanel；便签本身在 [LavaNotes 仓库](https://github.com/chengcczzjj/LavaNotes) |
+| 改名、数据目录、旧数据迁移 | 经验 L18 + legacyUserDataCore / legacy-migration 测试 |
 | 毛玻璃或常驻性能 | 经验 L07 + wallpaperFrameStore / FrostedGlassBackground |
 | 应用 AI 对话、人设、长期记忆 | 本页“产品设计资料” + 经验 L09；不要读取开发者全量日志给应用模型 |
+| 聊天智能体的桌面控制、确认、回执/撤回、快捷对话 | [伴侣智能体桌面控制设计](../../doc/伴侣智能体桌面控制设计.md) + 经验 L15 + companion-agent / companion-ux 测试 |
+| FlowWall 在线壁纸库、站点下载接管、`lingyue://` 协议 | [FlowWall 在线壁纸库接入设计](../../doc/FlowWall在线壁纸库接入设计.md) + 经验 L17、L10 + flowwall 测试与冒烟组 |
+| 画布组件点击穿透、被动/交互组件 | 经验 L16、L04-L05 + canvas-hit-test 源码与 shared-contracts 测试 |
 | 下载、更新、资源发布 | 经验 L10-L11 + [资源方案](../../doc/壁纸资源托管与下载方案.md) + release/resource 测试 |
 | 规则、日志整理与交接 | 根规则 + 收尾技能 + 本页 + 经验 L12 |
 
@@ -44,6 +47,8 @@
 | [GPT-5 技术方案](记忆系统/memory-system-technical-architecture-GPT-5.md) / [Opus 技术方案](记忆系统/memory-system-technical-architecture-Opus.md) | 2026-04 的技术选型/分阶段骨架参考，已有方向修正；不是要求重建现有工程的路线图 |
 | [demo 记忆草案](../demo/灵月记忆系统/memory-system-design.md) / [demo 技术草案](../demo/灵月记忆系统/memory-system-technical-architecture-GPT-5.md) | 历史快照，保留以便比较，不与修订版双写；入口已标记对应修订资料 |
 | [组件通用设计](../../doc/小组件/组件模块通用设计.md) / [桌面编排设计](../../doc/小组件/AI桌面编排系统设计.md) | 正式设计参考，规划动作不等于已注册工具；实际工具以源码注册表为准 |
+| [伴侣智能体桌面控制设计](../../doc/伴侣智能体桌面控制设计.md) | 2026-09-26 按源码描述已实现的工具常驻、确认策略、回执/撤回和快捷对话，§8 为 09-27 的交互与组件升级；继承桌面编排设计的风险分级，桌面编排设计 §8 的工具清单以此处和源码注册表为准 |
+| [FlowWall 在线壁纸库接入设计](../../doc/FlowWall在线壁纸库接入设计.md) | 2026-09-27 按源码描述内嵌页面隔离、下载状态机、导入后的使用方式与 `lingyue://` 协议；真实站点下载形态未实测 |
 
 ## 已被替代的做法与旧路径
 
@@ -53,7 +58,7 @@
 - `doc/project-status.md` 的历史引用现对应 [项目状态](project-status.md)；不在旧日志逐条改路径。
 - `doc/图标收纳组件方案.md` 的历史资料现位于 [早期方案](other/图标收纳组件方案.md)；当前模块设计见 [图标收纳设计](../../doc/小组件/图标收纳组件设计.md)。
 - `AI对话与智能体设计说明.md`、音频/天气等若干组件专用设计文档当前并不存在。使用本页现有资料与组件源码；不要把计划文件名当成可读取文件或补造历史内容。
-- 便利贴：2026-08-16 起的画布内“自由便利贴”（`todo-board`、任务工作台、`manage_todo_tasks`）已于 2026-10-07 移除，改为独立软件 LavaNotes。[桌面任务便笺设计](../../doc/小组件/桌面任务便笺组件设计.md) 只作历史参考，见 L06、L15。
+- 便利贴：2026-08-16 起的画布内“自由便利贴”（`todo-board`、任务工作台、`manage_todo_tasks`）已于 2026-10-07 移除，改为独立软件 LavaNotes。[桌面任务便笺设计](../../doc/小组件/桌面任务便笺组件设计.md) 只作历史参考，见 L06、L18。
 - 产品名：2026-10-07 起灵月桌面 / LingyueDesk 改名 LavaDesk（仓库 FlowWallDesk → LavaDesk、在线壁纸库 LingyueDesk-Wallpapers → LavaDesk-Wallpapers）。历史日志中的旧名、旧路径（`%APPDATA%\lingyue-desk`、`lingyue-config.json`）保持原样。
 - `other/灵月项目开发指南 .md` 文件名带空格；保留原路径兼容已有引用，Markdown 链接用 `%20` 表示空格。
 

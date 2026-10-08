@@ -22,27 +22,39 @@ const COMPANION_CORE_PROMPT = `【灵月伴侣对话基调】
 能力边界：
 - 默认优先处理陪聊、实时信息、搜索、剪贴板、打开网页、记忆、桌面组件等轻量能力。
 - 只有用户明确要求查看、生成、修改或运行本地文件/命令时，才进入本地文件操作语境。
-- 不要把桌面组件操作说成项目任务、工作区任务、checkpoint 或 artifact。
-
-当前时间：{time}`
+- 不要把桌面组件操作说成项目任务、工作区任务、checkpoint 或 artifact。`
 
 function buildSystemPersona(persona?: string): string {
   const rawPersona = persona?.trim() || DEFAULT_CHAT_PERSONA.prompt
   const personaPrompt = rawPersona.length > 12_000
     ? `${rawPersona.slice(0, 12_000)}\n[人设内容已按上下文预算截断]`
     : rawPersona
-  const systemPrompt = personaPrompt.includes('【灵月伴侣对话基调】')
-    ? personaPrompt
+  // The time used to live here; it now goes into the dynamic tail so this
+  // persona prefix stays byte-identical between turns (provider prompt caching).
+  return personaPrompt.includes('【灵月伴侣对话基调】')
+    ? personaPrompt.replace(/\n*当前时间：\{time\}\s*$/, '')
     : `${personaPrompt}\n\n${COMPANION_CORE_PROMPT}`
+}
 
-  return systemPrompt.replace(
-    '{time}',
-    new Date().toLocaleString('zh-CN')
-  )
+function formatNow(now = new Date()): string {
+  const weekday = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()]
+  return `${now.toLocaleString('zh-CN', { hour12: false })}（星期${weekday}）`
+}
+
+function describeAttachments(content: Record<string, unknown>): string {
+  const attachments = Array.isArray(content.attachments) ? content.attachments : []
+  const lines = attachments
+    .map((item) => (item && typeof item === 'object' ? item as Record<string, unknown> : null))
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item.id === 'string'))
+    .map((item) => `- ${String(item.name ?? '附件')}（${String(item.kind ?? 'file')}，id: ${String(item.id)}）`)
+  return lines.length > 0 ? `\n\n【附件】\n${lines.join('\n')}` : ''
 }
 
 export interface ContextResult {
+  /** Persona and companion rules: identical across turns. */
   system: string
+  /** Time, recalled memories and state: changes every turn, goes last. */
+  dynamicSystem: string
   messages: ModelMessage[]
 }
 
@@ -59,6 +71,7 @@ export function buildInitialContext(params: {
   const recentCharBudget = Math.floor(totalCharBudget * 0.58)
   const memoryCharBudget = Math.min(8000, Math.floor(totalCharBudget * 0.1))
   let fullSystemPrompt = buildSystemPersona(persona)
+  const dynamicBlocks: string[] = [`【当前时间】\n${formatNow()}`]
 
   try {
     const lastUserMsg = [...recentEvents]
@@ -75,11 +88,11 @@ export function buildInitialContext(params: {
         const memoryText = retrieval.memories
           .map((memory) => `- [${memory.key}] ${memory.content}`)
           .join('\n')
-        fullSystemPrompt += `\n\n【关于用户的已知记忆】\n${memoryText}`
+        dynamicBlocks.push(`【关于用户的已知记忆】\n${memoryText}`)
       }
 
       if (retrieval.stateText) {
-        fullSystemPrompt += `\n\n【当前状态信息】\n${retrieval.stateText}`
+        dynamicBlocks.push(`【当前状态信息】\n${retrieval.stateText}`)
       }
     }
   } catch {
@@ -95,7 +108,8 @@ export function buildInitialContext(params: {
     if (event.eventType === 'user_message') role = 'user'
     if (event.eventType === 'assistant_message') role = 'assistant'
     if (!role) continue
-    const raw = (event.content as { text?: string }).text
+    const text = (event.content as { text?: string }).text
+    const raw = role === 'user' && typeof text === 'string' ? `${text}${describeAttachments(event.content)}` : text
     if (typeof raw !== 'string' || !raw.trim()) continue
     const remaining = recentCharBudget - usedRecentChars
     if (remaining <= 0) break
@@ -110,6 +124,7 @@ export function buildInitialContext(params: {
     fullSystemPrompt = `${fullSystemPrompt.slice(0, totalCharBudget - recentCharBudget - 24)}\n[系统上下文已截断]`
   }
 
-  // Tool calls/results are not replayed as plain messages because that loses provider pairing.
-  return { system: fullSystemPrompt, messages }
+  // Tool calls/results are not replayed as plain messages because that loses provider pairing;
+  // the chat service adds a digest of recent desktop actions to the dynamic tail instead.
+  return { system: fullSystemPrompt, dynamicSystem: dynamicBlocks.join('\n\n'), messages }
 }

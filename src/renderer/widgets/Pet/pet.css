@@ -1,0 +1,47 @@
+.pet-widget--clickable { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.pet-widget--clickable:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14); }
+.pet-widget--clickable:active { transform: scale(0.97); }
+
+.pet-widget__hint {
+  position: absolute;
+  z-index: 3;
+  right: 8px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.88);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+.pet-widget--clickable:hover .pet-widget__hint { opacity: 1; transform: none; }
+
+.pet-widget__unread {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+  animation: pet-unread 1.8s ease-out infinite;
+}
+@keyframes pet-unread {
+  70% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.pet-widget__bubble { animation: pet-bubble-in 0.22s ease-out; }
+@keyframes pet-bubble-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-widget--clickable, .pet-widget__hint { transition: none; }
+  .pet-widget__unread, .pet-widget__bubble { animation: none; }
+}

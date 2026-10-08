@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '@shared/ipc-channels'
-import type { WallpaperApplyTarget, WallpaperItem, WallpaperSettings, WallpaperResourceCatalog, WallpaperResourceProgress, WallpaperResourceActionResult, WallpaperOwnerStatus, WallpaperOwnerConfigInput, WallpaperPublishInput, WallpaperPublishProgress, WallpaperPublishResult, WallpaperDisplayMode, WallpaperDisplaySettings, WidgetInstance, NewsItem, StockItem, StockSymbol, WeatherSnapshot, ApiEndpointMeta, ChatConversation, ChatMessage, ChatMemory, ModelProfile, ConversationMode, ChatProject, AgentRun, AgentRunEvent, AgentApproval, AgentApprovalDecision, AgentArtifact, AgentFileChange, AgentFileChangeReviewState, AgentAutomation, AgentAutomationResult, AgentAutomationScheduleType, AgentAutomationStatus, WorkspacePermissionProfile, AppUpdateStatus, LaunchAtLoginStatus, LavaNotesCommand, LavaNotesStatus } from '@shared/types'
+import type { CompanionSettings, CompanionSettingsSnapshot } from '@shared/companion-settings'
+import type { FlowWallDownload, FlowWallViewState } from '@shared/flowwall'
+import { createChatStreamApi } from './chat-stream'
+import type { WallpaperApplyTarget, WallpaperItem, WallpaperSettings, WallpaperResourceCatalog, WallpaperResourceProgress, WallpaperResourceActionResult, WallpaperOwnerStatus, WallpaperOwnerConfigInput, WallpaperPublishInput, WallpaperPublishProgress, WallpaperPublishResult, WallpaperDisplayMode, WallpaperDisplaySettings, WidgetInstance, NewsItem, StockItem, StockSymbol, WeatherSnapshot, ApiEndpointMeta, ChatConversation, ChatMemory, ModelProfile, ConversationMode, ChatProject, AgentRun, AgentApproval, AgentApprovalDecision, AgentArtifact, AgentFileChange, AgentFileChangeReviewState, AgentAutomation, AgentAutomationResult, AgentAutomationScheduleType, AgentAutomationStatus, WorkspacePermissionProfile, AppUpdateStatus, LaunchAtLoginStatus, LavaNotesCommand, LavaNotesStatus } from '@shared/types'
 
 const api = {
   app: {
@@ -26,8 +29,15 @@ const api = {
       ipcRenderer.invoke(IPC.APP_VALIDATE_PRECISE_LOCATION),
     openLocationSettings: (): Promise<boolean> => ipcRenderer.invoke(IPC.APP_OPEN_LOCATION_SETTINGS),
     quit: (): void => ipcRenderer.send(IPC.APP_QUIT),
-    onNavigate: (cb: (target: { activity: string; subPage?: string }) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, target: { activity: string; subPage?: string }) => cb(target)
+    getCompanionSettings: (): Promise<CompanionSettingsSnapshot> =>
+      ipcRenderer.invoke(IPC.COMPANION_GET_SETTINGS),
+    setCompanionSettings: (patch: Partial<CompanionSettings>): Promise<CompanionSettingsSnapshot> =>
+      ipcRenderer.invoke(IPC.COMPANION_SET_SETTINGS, patch),
+    revokeActionGrant: (key: string): Promise<CompanionSettingsSnapshot> =>
+      ipcRenderer.invoke(IPC.COMPANION_REVOKE_ACTION_GRANT, key),
+    toggleQuickChat: (): void => ipcRenderer.send(IPC.QUICK_CHAT_TOGGLE),
+    onNavigate: (cb: (target: { activity: string; subPage?: string; conversationId?: string }) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, target: { activity: string; subPage?: string; conversationId?: string }) => cb(target)
       ipcRenderer.on(IPC.APP_NAVIGATE, handler)
       return () => ipcRenderer.off(IPC.APP_NAVIGATE, handler)
     },
@@ -116,6 +126,29 @@ const api = {
       return () => ipcRenderer.off(IPC.WALLPAPER_OWNER_PUBLISH_PROGRESS, handler)
     },
   },
+  /** FlowWall 在线壁纸站：嵌入视图由主进程叠放在页面占位区域上。 */
+  flowwall: {
+    attach: (bounds: { x: number; y: number; width: number; height: number }): Promise<FlowWallViewState> =>
+      ipcRenderer.invoke(IPC.FLOWWALL_ATTACH, bounds),
+    detach: (): void => ipcRenderer.send(IPC.FLOWWALL_DETACH),
+    navigate: (action: 'back' | 'forward' | 'reload' | 'home' | 'stop' | { url: string }): Promise<FlowWallViewState> =>
+      ipcRenderer.invoke(IPC.FLOWWALL_NAVIGATE, action),
+    openExternal: (): Promise<boolean> => ipcRenderer.invoke(IPC.FLOWWALL_OPEN_EXTERNAL),
+    getState: (): Promise<{ view: FlowWallViewState; downloads: FlowWallDownload[] }> =>
+      ipcRenderer.invoke(IPC.FLOWWALL_GET_STATE),
+    cancelDownload: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.FLOWWALL_CANCEL_DOWNLOAD, id),
+    clearDownloads: (): Promise<FlowWallDownload[]> => ipcRenderer.invoke(IPC.FLOWWALL_CLEAR_DOWNLOADS),
+    onViewState: (cb: (state: FlowWallViewState) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: FlowWallViewState) => cb(state)
+      ipcRenderer.on(IPC.FLOWWALL_VIEW_STATE, handler)
+      return () => ipcRenderer.off(IPC.FLOWWALL_VIEW_STATE, handler)
+    },
+    onDownloadChanged: (cb: (download: FlowWallDownload) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, download: FlowWallDownload) => cb(download)
+      ipcRenderer.on(IPC.FLOWWALL_DOWNLOAD_CHANGED, handler)
+      return () => ipcRenderer.off(IPC.FLOWWALL_DOWNLOAD_CHANGED, handler)
+    },
+  },
   widget: {
     list: (): Promise<WidgetInstance[]> => ipcRenderer.invoke(IPC.WIDGET_LIST),
     add: (w: WidgetInstance) => ipcRenderer.invoke(IPC.WIDGET_ADD, w),
@@ -138,50 +171,12 @@ const api = {
       ipcRenderer.invoke(IPC.DATA_GET_API_REGISTRY),
   },
   chat: {
-    /** 本地生成 streamId，避免同步 IPC 阻塞渲染线程。 */
-    sendMessage: (payload: { conversationId?: string; projectId?: string | null; mode?: ConversationMode; text: string; internal?: boolean; forceAgentRun?: boolean }): string => {
-      const streamId = globalThis.crypto.randomUUID()
-      ipcRenderer.send(IPC.CHAT_SEND_MESSAGE, { streamId, payload })
-      return streamId
-    },
-    stopStream: (streamId: string): Promise<{ ok: boolean; error?: string }> =>
-      ipcRenderer.invoke(IPC.CHAT_STOP_STREAM, streamId),
-    /** 监听流式 token */
-    onStreamChunk: (cb: (data: { streamId: string; delta: string }) => void) => {
-      const handler = (_e: Electron.IpcRendererEvent, data: { streamId: string; delta: string }) => cb(data)
-      ipcRenderer.on(IPC.CHAT_STREAM_CHUNK, handler)
-      return () => ipcRenderer.removeListener(IPC.CHAT_STREAM_CHUNK, handler)
-    },
-    /** 监听流式完成 */
-    onStreamEnd: (cb: (data: { streamId: string; full: string; conversationId: string }) => void) => {
-      const handler = (_e: Electron.IpcRendererEvent, data: { streamId: string; full: string; conversationId: string }) => cb(data)
-      ipcRenderer.on(IPC.CHAT_STREAM_END, handler)
-      return () => ipcRenderer.removeListener(IPC.CHAT_STREAM_END, handler)
-    },
-    /** 监听流式错误 */
-    onStreamError: (cb: (data: { streamId: string; error: string }) => void) => {
-      const handler = (_e: Electron.IpcRendererEvent, data: { streamId: string; error: string }) => cb(data)
-      ipcRenderer.on(IPC.CHAT_STREAM_ERROR, handler)
-      return () => ipcRenderer.removeListener(IPC.CHAT_STREAM_ERROR, handler)
-    },
-    /** 监听 Tool 调用事件（start/complete/error） */
-    onToolCall: (cb: (data: { streamId: string; toolCallId: string; toolName: string; input: unknown; status: 'start' | 'complete' | 'error'; output?: unknown; error?: string; durationMs?: number }) => void) => {
-      const handler = (_e: Electron.IpcRendererEvent, data: { streamId: string; toolCallId: string; toolName: string; input: unknown; status: 'start' | 'complete' | 'error'; output?: unknown; error?: string; durationMs?: number }) => cb(data)
-      ipcRenderer.on(IPC.CHAT_TOOL_CALL, handler)
-      return () => ipcRenderer.removeListener(IPC.CHAT_TOOL_CALL, handler)
-    },
-    /** 监听 AgentRun 运行事件 */
-    onAgentRunEvent: (cb: (data: { streamId: string } & AgentRunEvent) => void) => {
-      const handler = (_e: Electron.IpcRendererEvent, data: { streamId: string } & AgentRunEvent) => cb(data)
-      ipcRenderer.on(IPC.AGENT_RUN_EVENT, handler)
-      return () => ipcRenderer.removeListener(IPC.AGENT_RUN_EVENT, handler)
-    },
+    ...createChatStreamApi(),
+    clearDesktopScenePreview: (): Promise<boolean> => ipcRenderer.invoke(IPC.CHAT_DESKTOP_SCENE_CLEAR_PREVIEW),
     newConversation: (mode?: ConversationMode): Promise<ChatConversation> =>
       ipcRenderer.invoke(IPC.CHAT_NEW_CONVERSATION, mode),
     listConversations: (): Promise<ChatConversation[]> =>
       ipcRenderer.invoke(IPC.CHAT_LIST_CONVERSATIONS),
-    getHistory: (conversationId: string, limit?: number): Promise<ChatMessage[]> =>
-      ipcRenderer.invoke(IPC.CHAT_GET_HISTORY, conversationId, limit),
     deleteConversation: (id: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC.CHAT_DELETE_CONVERSATION, id),
     renameConversation: (id: string, title: string): Promise<boolean> =>

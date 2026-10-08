@@ -259,6 +259,7 @@ function WallpaperCard(props: {
         <div className="wallpaper-card__placeholder">{TYPE_LABEL[item.type]}</div>
       )}
       <div className="wallpaper-card__type">{TYPE_LABEL[item.type]}</div>
+      {item.meta?.Source === 'flowwall' && <div className="wallpaper-card__source">FlowWall</div>}
       <div className="wallpaper-card__gradient" />
       <div className="wallpaper-card__title">{item.name}</div>
     </div>

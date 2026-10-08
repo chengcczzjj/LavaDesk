@@ -34,6 +34,15 @@ import {
   desktopSceneRollbackTool,
   widgetCapabilityListTool,
 } from './definitions/desktop-scene'
+import {
+  ambientSoundTool,
+  appControlTool,
+  createDesktopTools,
+  desktopModeTool,
+  petExpressTool,
+  systemControlTool,
+  wallpaperTool,
+} from './definitions/desktop-control'
 import { createWorkspaceFileTools, type WorkspaceToolContext } from './definitions/workspace-files'
 import { createCheckpointTools } from './definitions/checkpoints'
 import { createWorkspaceWriteTools } from './definitions/workspace-writes'
@@ -85,6 +94,13 @@ export function getToolSet(context: WorkspaceToolContext = {}, selectedToolNames
     desktop_scene_preview: desktopScenePreviewTool,
     desktop_scene_apply: desktopSceneApplyTool,
     desktop_scene_rollback: desktopSceneRollbackTool,
+    wallpaper: wallpaperTool,
+    desktop_mode: desktopModeTool,
+    ambient_sound: ambientSoundTool,
+    app_control: appControlTool,
+    system_control: systemControlTool,
+    pet_express: petExpressTool,
+    ...createDesktopTools(context),
     ...createWorkspaceFileTools(context),
     ...createCheckpointTools(context),
     ...createWorkspaceWriteTools(context),

@@ -3021,3 +3021,41 @@
   background: rgba(0, 0, 0, 0.06);
   margin: 3px 6px;
 }
+
+/* ─── Companion desktop actions ─── */
+.chat-action-confirm {
+  margin-bottom: 8px;
+}
+.chat-input__attachments {
+  padding: 8px 12px 0;
+}
+.chat-msg__bubble--rich .ly-md p:last-child,
+.chat-msg__bubble--rich .ly-md ul:last-child,
+.chat-msg__bubble--rich .ly-md ol:last-child {
+  margin-bottom: 0;
+}
+.chat-msg--user .ly-attachments {
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+/* Paste / drop attachments onto the conversation */
+.chat-drop-overlay {
+  position: absolute;
+  inset: 12px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-card, 12px);
+  background: color-mix(in srgb, var(--bg-card, #fff) 88%, transparent);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  animation: chat-drop-in 0.12s ease-out;
+}
+@keyframes chat-drop-in { from { opacity: 0; } }
