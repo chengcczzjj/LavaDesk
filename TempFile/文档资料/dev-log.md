@@ -5,6 +5,25 @@
 
 历史归档：[2026-08](archive/dev-log-2026-08.md) · [2026-05](archive/dev-log-2026-05.md) · [2026-04](archive/dev-log-2026-04.md)。主页和归档不重复保存同一条事件。
 
+## [2026-10-08] 发布 LavaDesk 1.2.0
+
+**变更摘要**: 按用户授权，在 main 的 `169da5d`（改名 + 便签拆分 + 合入 1.1.14）上手动运行 Windows 发布流程完成 1.2.0 远端发布。LavaNotes 的标签推送被会话权限检查拒绝，改为给其发布流程加手动运行入口，由用户在 Actions 中触发 1.0.0。
+
+**涉及模块**:
+- Git：`main` 由 `02002d3` 先快进到 `401c600`，合入 1.1.14 后再快进到 `169da5d`，未改写历史。首次发布运行（37738536304，构建 `401c600`）在安装依赖阶段取消，未生成 tag 或 Release。
+- 发布：Actions 运行 37740303582 在 `169da5d` 上构建，发布时创建 tag `v1.2.0`。
+- LavaNotes：`release.yml` 增加 `workflow_dispatch`（填写 tag，按构建提交建 tag）并保持 LF；推送后 CI 通过。
+
+**验证结果**:
+- Windows 运行器：`npm test`、Electron 冒烟、NSIS 构建与核验脚本全部通过；草稿资产大小核对后发布。
+- 会话内独立复核：Release 非草稿/预发布，tag 指向 `169da5d`，三项资产齐全；`releases/latest` 指向 v1.2.0；旧地址 `chengcczzjj/FlowWallDesk/releases/download/v1.2.0/latest.yml` 跳转可达。完整下载安装包 369,483,332 bytes，SHA-512 与 latest.yml 一致，SHA-256 `8949D81153A60491D4317D92B74CE32749002FB236D3568CB5EDCA892AE38845`，blockmap 388,822 bytes。
+- 未在 Windows 实机安装验收（自动更新为新应用、数据迁移、旧版清理）。
+
+**经验关联**: L18。
+**提交意图**: `docs(release): record 1.2.0 remote delivery`
+
+---
+
 ## [2026-10-08] 1.2.0 合入已发布的 1.1.14，仓库改名与 LavaNotes 上线
 
 **变更摘要**: 用户把仓库改名为 `chengcczzjj/LavaDesk` 并新建 `chengcczzjj/LavaNotes`，授权合并与提交。LavaNotes 1.0.0 源码已推送到其 main（CI 通过）。按授权把任务分支快进到 main 并触发 1.2.0 发布后，发现 1.1.14 已于 09-27 从 `claude/blissful-ritchie-iemaxr` 发布却从未合入 main；为避免 1.2.0 覆盖掉 1.1.14 的功能，在“安装依赖”步骤取消了该次运行（未生成 tag/Release），随后把该分支合入 1.2.0。`claude/nice-davinci-47j62f` 上 09-29 未发布的壁纸区界面改版未合入。

@@ -1,8 +1,8 @@
 # LavaDesk 项目进展
 
 > 源码与容器验证：2026-10-08；最近本机安装验证：2026-09-05（1.1.12）。
-> 1.2.0 起应用改名 LavaDesk（原灵月桌面 / LingyueDesk）：新安装标识、可执行文件与数据目录，首次启动自动迁移旧数据；便签拆分为独立软件 [LavaNotes](https://github.com/chengcczzjj/LavaNotes)。1.2.0 合入了已发布的 1.1.14（原在任务分支 `claude/blissful-ritchie-iemaxr`，此前未进 main），main 现包含两者；1.2.0 待发布。
-> 1.1.14 已于 09-27 由 GitHub Actions（windows-latest）构建并发布到 GitHub Release，远端资产与更新源已复核；尚未在 Windows 实机安装验收。
+> 1.2.0 起应用改名 LavaDesk（原灵月桌面 / LingyueDesk）：新安装标识、可执行文件与数据目录，首次启动自动迁移旧数据；便签拆分为独立软件 [LavaNotes](https://github.com/chengcczzjj/LavaNotes)。1.2.0 合入了已发布的 1.1.14（原在任务分支 `claude/blissful-ritchie-iemaxr`，此前未进 main），main 现包含两者。
+> 1.2.0 已于 10-08 由 GitHub Actions（windows-latest）在 main 的 `169da5d` 上构建并发布到 `chengcczzjj/LavaDesk` 的 GitHub Release，远端资产与更新源已复核，旧仓库名 FlowWallDesk 的更新地址可跳转；尚未在 Windows 实机安装验收。LavaNotes 1.0.0 源码已上线但尚未发布 Release。
 > 状态依据现有源码与开发记录，不使用无验收口径的完成百分比；“已实现”不等于所有设备场景均已实测。
 
 ## 当前方向与阅读入口
@@ -36,7 +36,7 @@ AI 伴侣优先：有形象、有温度、陪伴式对话、桌宠和轻量桌�
 | IPC/preload | 共享通道、角色化 bridge、sandbox 窗口 | 新增能力仍须同步校验与契约测试 |
 | 自动更新 | 启动/每 6 小时/唤醒后检查，失败按 2–60 分钟退避重试；发现新版本后台自动下载，完成后系统通知与托盘“重启并更新”，安装由用户确认 | 配置/安全/重试契约已测试；真实网络中断与睡眠唤醒需实机观察 |
 | 开机启动 | 安装版注册启动项，设置可关闭 | 锁屏/开机恢复依赖 Windows 实机验证 |
-| 发行 | [1.2.0](../../doc/发布说明/1.2.0.md) 改名版待发布（含 1.1.14 全部内容；安装包改为 `LavaDesk-Setup-<版本>.exe`，更新源改为 `chengcczzjj/LavaDesk`）；[1.1.14](../../doc/发布说明/1.1.14.md) 已远端发布并复核；自 1.1.13 起由 [Windows 发布流程](../../.github/workflows/release-windows.yml) 在 CI 构建、核验清单/哈希/asar 后先草稿再发布，同版本已发布即拒绝覆盖 | 推送 tag 触发；手动运行需工作流已在 main，可指定任意分支构建（发布时在构建提交上建 tag）；未配置 Windows 代码签名证书 |
+| 发行 | [1.2.0](../../doc/发布说明/1.2.0.md) 改名版已远端发布并复核（含 1.1.14 全部内容；安装包改为 `LavaDesk-Setup-<版本>.exe`，更新源改为 `chengcczzjj/LavaDesk`）；[1.1.14](../../doc/发布说明/1.1.14.md) 为上一版；自 1.1.13 起由 [Windows 发布流程](../../.github/workflows/release-windows.yml) 在 CI 构建、核验清单/哈希/asar 后先草稿再发布，同版本已发布即拒绝覆盖 | 推送 tag 触发；手动运行需工作流已在 main，可指定任意分支构建（发布时在构建提交上建 tag）；未配置 Windows 代码签名证书 |
 
 ## 桌面组件与管理界面
 
